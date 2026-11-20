@@ -11,8 +11,11 @@
 > **Version 0.2** : chaque photo lue une seule fois, modèle sur la carte graphique (WebGPU) pendant l'analyse, lectures
 > limitées à 2 à la fois ; 4 fois plus rapide sur des photos de 12 Mpx (ARCHITECTURE § 3.5).
 >
-> **Reprendre ici** : l'utilisateur refait l'essai sur 1 000 photos, dit ce qui est bien ou mal trouvé, et note le
-> temps d'analyse.
+> (21/11) Essai de la version 0.2 par l'utilisateur sur ses vraies photos : **« la détection a super bien marché »**.
+> Projet mis en pause, à reprendre plus tard.
+>
+> **Reprendre ici** : appli PC utilisable (§ 3 : trier par duels ou grille, dossier « À supprimer », ménage des
+> copies exactes). Les seuils par défaut (§ 2) peuvent rester tels quels tant que la détection convient.
 
 ## 1. Décisions prises (20/11/2026)
 
