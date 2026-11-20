@@ -1,0 +1,9 @@
+node_modules
+dist
+*.local
+.env*
+*.tsbuildinfo
+test-results
+playwright-report
+# Photos d'essai générées pour les tests de bout en bout
+e2e/.photos
