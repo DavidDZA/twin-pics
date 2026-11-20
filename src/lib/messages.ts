@@ -1,15 +1,29 @@
 /** Messages échangés avec les workers d'analyse (`analyze.worker.ts`) et du modèle (`embed.worker.ts`). */
 
+/** Pixels RGBA d'une petite version de la photo (petit côté de 256 px) : l'entrée du modèle. */
+export interface Pixels {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
 export interface AnalyzeRequest {
   id: number;
-  file: File;
+  /** Le fichier, lu une seule fois par la page et transféré au worker. */
+  buffer: ArrayBuffer;
+  /**
+   * `full` : toute l'analyse ; `pixels` : seulement l'entrée du modèle (photo déjà analysée, sans vecteur).
+   */
+  mode: 'full' | 'pixels';
   needSha: boolean;
+  /** Préparer l'entrée du modèle si la photo est datée (photos similaires demandées). */
+  wantPixels: boolean;
 }
 
 export interface AnalyzeResult {
   id: number;
   ok: boolean;
-  /** Pourquoi la photo n'a pas pu être lue (« decode » : format que le navigateur ne sait pas ouvrir, HEIC…). */
+  /** Pourquoi la photo n'a pas pu être lue (« decode » : format que le navigateur ne sait pas ouvrir…). */
   error?: string;
   sha?: string;
   dhash?: string;
@@ -19,13 +33,17 @@ export interface AnalyzeResult {
   time?: number;
   camera?: string;
   thumb?: Blob;
+  pixels?: Pixels;
 }
 
-export type EmbedRequest = { type: 'load' } | { type: 'embed'; id: number; file: File };
+/** Où tourne le modèle : la carte graphique (WebGPU) ou le processeur (WebAssembly). */
+export type ModelDevice = 'webgpu' | 'wasm';
+
+export type EmbedRequest = { type: 'load'; device: 'auto' | 'wasm' } | { type: 'embed'; id: number; pixels: Pixels };
 
 export type EmbedMessage =
   | { type: 'progress'; loaded: number; total: number }
-  | { type: 'ready'; device: string }
+  | { type: 'ready'; device: ModelDevice; dtype: string }
   | { type: 'vector'; id: number; vector: Float32Array }
   | { type: 'failed'; id: number; error: string }
   | { type: 'error'; error: string };

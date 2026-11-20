@@ -57,6 +57,8 @@ export const fr = {
     modelError: 'Le modèle n’a pas pu être téléchargé : pas de photos similaires cette fois.',
     elapsed: (time: string, analyzed: number) =>
       analyzed ? `Analyse faite en ${time} (${analyzed} photo${s(analyzed)} nouvelle${s(analyzed)}).` : `Analyse faite en ${time}, rien de nouveau.`,
+    device: (gpu: boolean): string =>
+      gpu ? 'Photos similaires calculées par la carte graphique.' : 'Photos similaires calculées par le processeur, plus lent : la carte graphique n’est pas disponible dans ce navigateur.',
     another: 'Autre dossier',
     rescan: 'Relancer',
     verified: (good: number, wrong: number) => `Vérifiés : ${good} bien trouvé${s(good)}, ${wrong} erreur${s(wrong)}`,

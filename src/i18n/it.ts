@@ -56,6 +56,7 @@ export const it: Dict = {
       '.',
     modelError: 'Non è stato possibile scaricare il modello: niente foto simili questa volta.',
     elapsed: (time, analyzed) => (analyzed ? `Analisi completata in ${time} (${analyzed} ${pl(analyzed, 'foto nuova', 'foto nuove')}).` : `Analisi completata in ${time}, niente di nuovo.`),
+    device: (gpu) => (gpu ? 'Foto simili calcolate dalla scheda grafica.' : 'Foto simili calcolate dal processore, più lento: la scheda grafica non è disponibile in questo browser.'),
     another: 'Altra cartella',
     rescan: 'Rianalizza',
     verified: (good, wrong) => `Verificati: ${good} ${pl(good, 'corretto', 'corretti')}, ${wrong} ${pl(wrong, 'errore', 'errori')}`,

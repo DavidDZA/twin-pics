@@ -105,6 +105,7 @@ export function Results({ result, onRescan, canRescan, onAnother }: Props) {
       <p className="muted small">
         {T.results.elapsed(duration(result.seconds), result.analyzed)}
         {skipped > 0 && <> {T.results.skipped(result.unreadable, result.unsupported, result.videos)}</>}
+        {result.device && <> {T.results.device(result.device === 'webgpu')}</>}
       </p>
       {result.modelError && (
         <p className="error" role="alert">

@@ -57,6 +57,7 @@ export const es: Dict = {
     modelError: 'No se ha podido descargar el modelo: esta vez no hay fotos parecidas.',
     elapsed: (time, analyzed) =>
       analyzed ? `Análisis hecho en ${time} (${analyzed} foto${s(analyzed)} nueva${s(analyzed)}).` : `Análisis hecho en ${time}, nada nuevo.`,
+    device: (gpu) => (gpu ? 'Fotos parecidas calculadas con la tarjeta gráfica.' : 'Fotos parecidas calculadas con el procesador, más lento: la tarjeta gráfica no está disponible en este navegador.'),
     another: 'Otra carpeta',
     rescan: 'Volver a analizar',
     verified: (good, wrong) => `Revisados: ${good} correcto${s(good)}, ${wrong} error${wrong === 1 ? '' : 'es'}`,

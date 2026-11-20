@@ -7,8 +7,12 @@
 > (modèle DINOv2 dans le navigateur), suggestion de la photo à garder, curseurs de réglage en direct, réponses « Bien
 > trouvé » / « Pas des doublons » gardées, visionneuse, 6 langues, tests Vitest et Playwright, déploiement GitHub Pages.
 >
-> **Reprendre ici** : l'utilisateur essaie le prototype sur ses vraies photos (un dossier de quelques milliers pour
-> commencer), dit ce qui est bien ou mal trouvé, et note le temps d'analyse.
+> (21/11) Premier essai de l'utilisateur : 10 000 photos (56 Go, disque dur) en 15 min + 50 min de photos similaires.
+> **Version 0.2** : chaque photo lue une seule fois, modèle sur la carte graphique (WebGPU) pendant l'analyse, lectures
+> limitées à 2 à la fois ; 4 fois plus rapide sur des photos de 12 Mpx (ARCHITECTURE § 3.5).
+>
+> **Reprendre ici** : l'utilisateur refait l'essai sur 1 000 photos, dit ce qui est bien ou mal trouvé, et note le
+> temps d'analyse.
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -45,10 +49,11 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 - Grosse bibliothèque (50 000 photos) : comparaison dHash de toutes les paires (1,25 milliard, quelques secondes dans
   un worker) → index multi-blocs si besoin ; miniatures en base (≈ 500 Mo) → n'en garder que pour les photos d'un
   groupe possible.
-- Modèle : WebGPU quand il est disponible (bien plus rapide que WebAssembly), ou plusieurs fils d'exécution
-  (isolation cross-origin, impossible sur GitHub Pages sans astuce de service worker) ; ne calculer les vecteurs que
-  des photos datées avec une voisine (déjà le cas).
-- Décodage : Chrome décode la photo entière ; la miniature EXIF intégrée pourrait servir au tri préalable.
+- ~~Modèle sur la carte graphique, une seule lecture des photos~~ — fait le 21/11 (version 0.2). Reste, sur le
+  processeur : plusieurs fils d'exécution (isolation cross-origin, impossible sur GitHub Pages sans astuce de service
+  worker).
+- Décodage (110 ms par photo de 12 Mpx) : décoder directement à taille réduite (−20 %) quand les dimensions sont
+  connues (EXIF) ; la miniature EXIF intégrée pourrait servir au tri préalable.
 - HEIC (iPhone) : décodeur WebAssembly (libheif) si l'utilisateur en a.
 
 ## 5. Autres sources de photos

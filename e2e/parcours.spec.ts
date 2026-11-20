@@ -17,7 +17,7 @@ test('départ : promesse, confidentialité, option des photos similaires', async
   await expect(page.getByText('Retrouve tes photos en double')).toBeVisible();
   await expect(page.getByText('aucune photo n’est envoyée')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Choisir un dossier de photos' })).toBeVisible();
-  await expect(page.getByText(/Un modèle de 24 Mo/)).toBeVisible();
+  await expect(page.getByText(/Un modèle de 45 Mo/)).toBeVisible();
 });
 
 test('trouve les copies exactes et les quasi identiques', async ({ page }) => {
@@ -111,19 +111,44 @@ test('langue : en anglais, toute l’interface suit', async ({ page }) => {
   await expect(page.getByText('Suggestion · the original')).toBeVisible();
 });
 
-test('photos similaires avec le modèle (téléchargé)', async ({ page }) => {
-  test.skip(!process.env.E2E_MODELE, 'télécharge le modèle : E2E_MODELE=1');
-  test.setTimeout(240_000);
-  await analyze(page, true);
+/** La rafale d'essai (cadrage décalé, plus claire, floue) dans l'onglet « Similaires », la plus nette proposée. */
+async function expectBurst(page: Page) {
   await page.getByText('Réglages de la détection').click();
-  // Ressemblance minimale abaissée : la rafale d'essai (cadrage décalé, plus claire, floue) doit sortir.
+  // Ressemblance minimale abaissée : la rafale d'essai ressemble à environ 87 %.
   await page.locator('.slider', { hasText: 'ressemblance minimale' }).locator('input').fill('80');
   await page.getByRole('tab', { name: /Similaires/ }).click();
   const group = page.getByTestId('group').first();
   await expect(group).toBeVisible();
   await expect(group.locator('li')).toHaveCount(2);
-  // La plus nette proposée : rafale-1 (rafale-2 est floue).
   await expect(group.locator('li.best .name')).toHaveText('rafale-1.jpg');
   await expect(group.getByText('Suggestion · la plus nette')).toBeVisible();
   await expect(group.getByText(/ressemble à \d+ %/)).toBeVisible();
+}
+
+test.describe('modèle des photos similaires (téléchargé : E2E_MODELE=1)', () => {
+  test.skip(!process.env.E2E_MODELE, 'télécharge le modèle');
+  test.setTimeout(240_000);
+
+  test('carte graphique si possible, rafale trouvée pendant l’analyse', async ({ page }) => {
+    await analyze(page, true);
+    await expect(page.getByText(/Photos similaires calculées par (la carte graphique|le processeur)/)).toBeVisible();
+    await expectBurst(page);
+  });
+
+  test('sur le processeur (sans carte graphique), même résultat', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('model-device', 'wasm'));
+    await analyze(page, true);
+    await expect(page.getByText(/Photos similaires calculées par le processeur/)).toBeVisible();
+    await expectBurst(page);
+  });
+
+  test('photos similaires demandées après une analyse sans elles : les photos déjà vues sont complétées', async ({ page }) => {
+    await analyze(page, false);
+    await expect(page.getByText(/calculées par/)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Autre dossier' }).click();
+    await page.getByRole('checkbox', { name: /photos similaires/ }).check();
+    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 120_000 });
+    await expectBurst(page);
+  });
 });

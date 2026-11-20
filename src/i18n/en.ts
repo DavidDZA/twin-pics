@@ -56,6 +56,7 @@ export const en: Dict = {
       '.',
     modelError: 'The model couldn’t be downloaded: no similar photos this time.',
     elapsed: (time, analyzed) => (analyzed ? `Analysis done in ${time} (${analyzed} new photo${s(analyzed)}).` : `Analysis done in ${time}, nothing new.`),
+    device: (gpu) => (gpu ? 'Similar photos computed on the graphics card.' : 'Similar photos computed on the processor, which is slower: the graphics card isn’t available in this browser.'),
     another: 'Other folder',
     rescan: 'Run again',
     verified: (good, wrong) => `Checked: ${good} correct, ${wrong} wrong`,

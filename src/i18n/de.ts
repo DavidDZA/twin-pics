@@ -54,6 +54,7 @@ export const de: Dict = {
       '.',
     modelError: 'Das Modell konnte nicht geladen werden: diesmal keine ähnlichen Fotos.',
     elapsed: (time, analyzed) => (analyzed ? `Analyse in ${time} fertig (${analyzed} neue${analyzed === 1 ? 's' : ''} Foto${analyzed === 1 ? '' : 's'}).` : `Analyse in ${time} fertig, nichts Neues.`),
+    device: (gpu) => (gpu ? 'Ähnliche Fotos auf der Grafikkarte berechnet.' : 'Ähnliche Fotos auf dem Prozessor berechnet, langsamer: Die Grafikkarte ist in diesem Browser nicht verfügbar.'),
     another: 'Anderer Ordner',
     rescan: 'Neu starten',
     verified: (good, wrong) => `Geprüft: ${good} richtig, ${wrong} falsch`,
