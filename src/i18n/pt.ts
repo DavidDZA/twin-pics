@@ -104,7 +104,7 @@ export const pt: Dict = {
     remove: 'Apagar',
     kept: 'Mantida',
     removed: 'Para apagar',
-    zoom: 'Ampliar',
+    zoom: 'Tela cheia',
     gridHelp: 'Escolha as fotos que vai manter: um clique numa foto mantém ou apaga.',
     keysHelp: 'Teclas 1 a 9: mudar uma foto · Enter: confirmar.',
     suggestionOnly: 'Manter a sugestão',

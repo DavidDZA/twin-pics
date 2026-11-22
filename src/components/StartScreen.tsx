@@ -4,6 +4,7 @@ import { getMeta } from '../lib/db';
 import { EMBED_SIZE_MB } from '../lib/model';
 import { nameOf } from '../lib/filetypes';
 import { RELEASES_URL, desktop } from '../platform';
+import { TwinCards } from './TwinCards';
 
 interface Props {
   canPick: boolean;
@@ -35,6 +36,7 @@ export function StartScreen({ canPick, similar, onSimilar, onPick, onFiles, onRe
 
   return (
     <section className="start">
+      <TwinCards />
       <p className="lead">{T.app.tagline}</p>
       <p className="muted">{T.app.privacy}</p>
 

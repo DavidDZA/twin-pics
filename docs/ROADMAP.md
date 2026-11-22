@@ -19,6 +19,11 @@
 > photo, plusieurs ou aucune ; fenêtre « Avant de supprimer » ; Corbeille de Windows ou dossier « À supprimer » au
 > choix, annulable ; tri retenu entre deux lancements. ARCHITECTURE § 2.1 et § 4.
 >
+> (22/11, retour de l'utilisateur) **Version 0.3.1** : un groupe de deux photos va directement au résumé en mode
+> duels ; bouton « Plein écran » sur chaque photo (grille et duels) ; flèches à gauche et à droite dans la
+> visionneuse (et glisser le doigt) ; habillage plus « fun » (ARCHITECTURE § 2.2). Question ouverte : détecter les
+> photos « pas intéressantes » (§ 6.1), en discussion avant de coder.
+>
 > **Reprendre ici** : retour de l'utilisateur sur l'exe (télécharger `Twin Pics 0.3.0.exe` dans les *Releases*,
 > l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Puis § 3 (ménage des
 > copies exactes en un bouton…) ou § 5.3 (appli Android).
@@ -107,6 +112,15 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 4. iPhone (PhotoKit), plus tard.
 
 ## 6. Plus tard
+
+### 6.1 Photos « pas intéressantes » (idée de l'utilisateur, 22/11/2026)
+
+Une nouvelle catégorie à côté des doublons : photos floues, ratées (trop sombres, brûlées, prises dans la poche),
+captures d'écran, photos de documents ou de tickets, images reçues par messagerie. Pistes proposées à l'utilisateur,
+à décider avant de coder : d'abord des règles simples sur ce que l'analyse calcule déjà ou presque (netteté, exposition,
+image presque uniforme, format d'écran sans appareil photo dans l'EXIF, dossier WhatsApp…), chaque photo avec sa
+raison ; ensuite un modèle qui comprend des phrases (CLIP / MobileCLIP) pour « un ticket de caisse », « une capture
+d'écran », « une photo floue » ; enfin, apprendre des choix de l'utilisateur.
 
 Captures d'écran, photos floues ou ratées, mèmes reçus, vidéos en double ; visages et yeux ouverts (MediaPipe, local)
 pour la suggestion ; préférences apprises des duels.

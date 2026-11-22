@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T } from '../i18n';
 import type { Group, PhotoInfo } from '../lib/groups';
@@ -19,13 +19,19 @@ interface Props {
   onToggle?: (key: string) => void;
 }
 
-/** Une photo du groupe en grand (le fichier d'origine), avec les flèches pour passer aux autres. */
+/**
+ * Une photo du groupe en plein écran (le fichier d'origine). Pour passer aux autres photos du groupe : les flèches à
+ * gauche et à droite de la photo, les flèches du clavier, ou glisser le doigt (téléphone).
+ */
 export function Viewer({ group, start, photos, files, onClose, choice, onToggle }: Props) {
   const [index, setIndex] = useState(start);
   const [url, setUrl] = useState<string | null>(null);
   const photo = photos[group.members[index]];
   const count = group.members.length;
   const mark = choice?.[photo.key];
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const prev = () => setIndex((i) => (i + count - 1) % count);
+  const next = () => setIndex((i) => (i + 1) % count);
 
   useEffect(() => {
     const file = files.get(photo.key);
@@ -63,19 +69,35 @@ export function Viewer({ group, start, photos, files, onClose, choice, onToggle 
           {T.viewer.close}
         </button>
       </div>
-      <div className="viewer-body" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        {url && <img src={url} alt={photo.name} />}
+      <div
+        className="viewer-body"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+        onTouchStart={(e) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
+        onTouchEnd={(e) => {
+          const start = touch.current;
+          touch.current = null;
+          if (!start || count < 2) return;
+          const dx = e.changedTouches[0].clientX - start.x;
+          const dy = e.changedTouches[0].clientY - start.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) (dx < 0 ? next : prev)();
+        }}
+      >
+        {url && <img key={photo.key} src={url} alt={photo.name} />}
+        {count > 1 && (
+          <>
+            <button className="viewer-arrow left" onClick={prev} aria-label={T.viewer.prev} title={T.viewer.prev}>
+              ‹
+            </button>
+            <button className="viewer-arrow right" onClick={next} aria-label={T.viewer.next} title={T.viewer.next}>
+              ›
+            </button>
+          </>
+        )}
       </div>
-      <div className="viewer-bar">
-        <button className="secondary" onClick={() => setIndex((index + count - 1) % count)} disabled={count < 2}>
-          ‹ {T.viewer.prev}
-        </button>
+      <div className="viewer-bar info-bar">
         <span className="muted small info">
           {folderOf(shortPath(photo.path))} · {photoDetails(photo)}
         </span>
-        <button className="secondary" onClick={() => setIndex((index + 1) % count)} disabled={count < 2}>
-          {T.viewer.next} ›
-        </button>
       </div>
     </div>,
     document.body,

@@ -1,7 +1,7 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.3 : appli PC en exe,
-> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4). Ce qui reste à faire est dans
+> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.3.1 : appli PC en exe,
+> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4 ; habillage plus « fun », § 2.2). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
 > choix) est dans `DavidDZA\IDEES-APPLIS.md`, idée 1.
 
@@ -29,8 +29,9 @@ Trois écrans (`App.tsx`) :
   compte rendu de la dernière suppression, ce qui n'a pas été analysé, réglages de la détection (`SettingsPanel`,
   curseurs, retenus : `detect-params`), onglets par niveau, groupes (`GroupCard`, 30 puis « Voir plus » : état du tri
   photo par photo, « Trier ce groupe » / « Modifier le tri », « Bien trouvé » / « Pas des doublons »), visionneuse
-  (`Viewer` : le fichier d'origine en grand, flèches, Échap ; pendant le tri, le choix « Gardée » / « À supprimer »
-  de la photo).
+  (`Viewer` : le fichier d'origine en plein écran ; pour passer aux autres photos du groupe, grandes flèches à gauche
+  et à droite de la photo, flèches du clavier ou glisser le doigt ; Échap ferme ; pendant le tri, le choix « Gardée » /
+  « À supprimer » de la photo).
 - Par-dessus les résultats : l'**écran de tri** (`Sorter`, plein écran) et la fenêtre **« Avant de supprimer »**
   (`RemoveDialog`), § 4.
 
@@ -38,7 +39,7 @@ Trois écrans (`App.tsx`) :
 
 | Élément | Choix |
 |---|---|
-| Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil) et `src/sort.css` (tri, suppression) |
+| Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil), `src/sort.css` (tri, suppression), `src/theme.css` (habillage, § 2.2) |
 | Appli PC | **Electron** 45 (`electron/`, construit par esbuild), exe portable par **electron-builder** (`npm run dist`, workflow `release.yml`) : § 2.1 |
 | Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta`, `marks` |
 | Lecture du dossier | Appli PC : le processus principal liste le dossier (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
@@ -97,6 +98,16 @@ Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disq
 - Variables d'environnement des tests : `TP_USER_DATA` (dossier de l'appli), `TP_PICK_FOLDER` /
   `TP_PICK_REMOVE_FOLDER` (réponses des fenêtres de choix de dossier), `TP_FAKE_TRASH` (dossier qui remplace la
   Corbeille), `TP_FAKE_TRASH_FAIL` (Corbeille refusée, comme sur une clé USB).
+
+### 2.2 Habillage (`theme.css`)
+
+Demandé le 22/11/2026 : « un peu plus fun ». Chargé en dernier, il ne change que l'apparence : les couleurs du logo
+(bleu `--brand-a`, orange `--brand-b`) en dégradé (`--brand`) pour les boutons principaux, les onglets choisis, les
+titres et les chiffres ; deux halos de couleur en fond ; boutons arrondis qui réagissent au survol et au clic ; cartes
+douces avec ombre ; un emoji décoratif par case de chiffres (📸 👯 🗂️ 💾, ignorés par les lecteurs d'écran) ;
+**logo animé** (`TwinCards` : deux photos jumelles qui se rejoignent au départ, se mélangent pendant l'analyse) ;
+barre de progression du tri ; « VS » entre les deux photos d'un duel ; 🎉 à la fin du tri et après une suppression.
+Toutes les animations s'arrêtent si le système demande moins de mouvement (`prefers-reduced-motion`).
 
 ## 3. L'analyse (`scan.ts`)
 
@@ -226,14 +237,16 @@ supprimer ; les suppressions faites à la fin, en une fois.
 - **Grille** : tout le groupe à l'écran, aussi grand que possible (2 colonnes jusqu'à 4 photos, 3 jusqu'à 9, puis 4 ;
   les lignes se partagent la hauteur), la suggestion gardée et les autres à supprimer (`suggestionOnly`). Un clic sur
   une photo change son choix (cadre vert plein « ✓ Gardée » / rouge pointillé « ✕ À supprimer », photo pâlie) ;
-  touches 1 à 9 et Entrée ; « Agrandir » ouvre la visionneuse (où le choix se change aussi). Boutons « Garder la
+  touches 1 à 9 et Entrée ; **« Plein écran »**, posé sur chaque photo (sous la photo au téléphone, en grille), ouvre
+  la visionneuse (où le choix se change aussi). Boutons « Garder la
   suggestion », « Tout garder », « Tout supprimer » (avertissement « Aucune photo gardée »), « ‹ Précédent »,
   « Passer », « Valider › ». Les photos d'origine sont affichées jusqu'à 12 par groupe, les miniatures au-delà
   (`PhotoImage` : la miniature d'abord, puis le fichier).
 - **Duels** (« duel simple + résumé », choix de l'utilisateur) : la suggestion affronte la photo suivante, on touche la
   préférée, la gagnante affronte la suivante (`startDuel`, `pickWinner`) ; à la fin, le **résumé** du groupe est la
   grille, avec seulement la gagnante gardée (`onlyKeep`) : c'est là qu'on en garde plusieurs ou aucune, ou « Refaire
-  les duels ». Un groupe déjà trié s'ouvre directement sur son résumé.
+  les duels ». Un groupe déjà trié s'ouvre directement sur son résumé, **un groupe de deux photos aussi** (le duel
+  n'apporterait rien de plus, remarque de l'utilisateur le 22/11). « Plein écran » sur chaque photo du duel.
 - **Téléphone en paysage** : les deux photos du duel côte à côte, barres compactes, consigne masquée ; le résumé défile
   et « Valider » reste collé en bas (aussi en portrait).
 - **Retenu** : « Valider » enregistre le choix de chaque photo (`marks`) et passe au groupe suivant **non trié**.
@@ -294,8 +307,10 @@ durées par `Intl` (`bytes`, `duration`).
   anglais. Avec `E2E_MODELE=1` (télécharge le modèle) : rafale trouvée pendant l'analyse, la plus nette proposée, et
 où a tourné le modèle affiché ; même chose sur le processeur forcé ; photos similaires demandées après une analyse
 sans elles (photos déjà vues complétées).
-- **Playwright, tri sur le site** (`e2e/tri.spec.ts`, téléphone et PC) : duels puis résumé (en garder deux), deux
-  duels dans un groupe de trois, fin du tri, fenêtre « Avant de supprimer » sans bouton de suppression mais avec le
+- **Playwright, visionneuse** (`e2e/parcours.spec.ts`) : flèches à gauche et à droite de la photo, clavier ; au
+  téléphone, glisser le doigt.
+- **Playwright, tri sur le site** (`e2e/tri.spec.ts`, téléphone et PC) : groupe de deux photos directement au résumé
+  (en garder deux), deux duels dans un groupe de trois (« VS », la copie gagne), « Plein écran » pendant un duel, fin du tri, fenêtre « Avant de supprimer » sans bouton de suppression mais avec le
   lien vers l'appli PC ; grille (« Tout garder », « Passer », « Revoir les groupes passés », choix changé dans la
   visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; téléphone : duel l'une sous l'autre en
   portrait, côte à côte en paysage (760 × 393), résumé sans défilement horizontal. Captures dans `test-results/`.

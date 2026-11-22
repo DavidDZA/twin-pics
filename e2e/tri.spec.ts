@@ -26,35 +26,37 @@ async function openSorter(page: Page, view: 'Grille' | 'Duels') {
   await expect(sorter(page).getByRole('button', { name: view, pressed: true })).toBeVisible();
 }
 
-test('duels : on touche la préférée, puis le résumé permet d’en garder plusieurs', async ({ page }, info) => {
+test('duels : deux photos vont droit au résumé ; à trois, la gagnante affronte la suivante', async ({ page }, info) => {
   await analyze(page);
   await openSorter(page, 'Duels');
   const s = sorter(page);
+  // Groupe 1 : deux photos seulement, pas de duel (il ne dirait rien de plus que le résumé).
   await expect(s.getByText('Groupe 1 sur 2')).toBeVisible();
-  await expect(s.getByText('Touche celle que tu préfères.')).toBeVisible();
-  await expect(s.getByText('Duel 1 sur 1')).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, `duel-${info.project.name}.png`) });
-  // La copie gagne : c'est elle qu'on garde.
-  await s.getByRole('button', { name: 'chat - Copie.jpg' }).click();
+  await expect(s.getByText('Touche celle que tu préfères.')).toHaveCount(0);
   await expect(s.getByTestId('counts')).toHaveText('1 gardée, 1 à supprimer');
-  await expect(s.getByRole('button', { name: 'chat - Copie.jpg · Gardée' })).toBeVisible();
-  await expect(s.getByRole('button', { name: 'Refaire les duels' })).toBeVisible();
+  await expect(s.getByRole('button', { name: 'Refaire les duels' })).toHaveCount(0);
   // Résumé : on garde les deux.
-  await s.getByRole('button', { name: 'chat.jpg · À supprimer' }).click();
+  await s.getByRole('button', { name: 'chat - Copie.jpg · À supprimer' }).click();
   await expect(s.getByTestId('counts')).toHaveText('2 gardées, 0 à supprimer');
   await s.getByRole('button', { name: 'Valider ›' }).click();
 
-  // Groupe 2 : trois photos, deux duels ; la suggestion gagne deux fois.
+  // Groupe 2 : trois photos, deux duels ; la copie WhatsApp gagne les deux.
   await expect(s.getByText('Groupe 2 sur 2')).toBeVisible();
+  await expect(s.getByText('Touche celle que tu préfères.')).toBeVisible();
   await expect(s.getByText('Duel 1 sur 2')).toBeVisible();
-  await s.getByRole('button', { name: 'plage.jpg' }).click();
+  await expect(s.getByText('VS', { exact: true })).toBeVisible();
+  await page.screenshot({ path: join(SHOTS, `duel-${info.project.name}.png`) });
+  await s.getByRole('button', { name: 'IMG-20240714-WA0001.jpg' }).click();
   await expect(s.getByText('Duel 2 sur 2')).toBeVisible();
-  await s.getByRole('button', { name: 'plage.jpg' }).click();
+  await s.getByRole('button', { name: 'IMG-20240714-WA0001.jpg' }).click();
   await expect(s.getByTestId('counts')).toHaveText('1 gardée, 2 à supprimer');
+  await expect(s.getByRole('button', { name: 'IMG-20240714-WA0001.jpg · Gardée' })).toBeVisible();
+  await expect(s.getByRole('button', { name: 'Refaire les duels' })).toBeVisible();
   await s.getByRole('button', { name: 'Valider ›' }).click();
 
   // Fin : 2 photos à supprimer ; le site ne supprime pas, il propose l'appli PC.
   await expect(s.getByText('Tous les groupes sont triés.')).toBeVisible();
+  await page.screenshot({ path: join(SHOTS, `fin-${info.project.name}.png`) });
   await s.getByRole('button', { name: /Supprimer 2 photos/ }).click();
   const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
   await expect(modal.getByTestId('remove-summary')).toContainText('2 photos à supprimer');
@@ -66,6 +68,22 @@ test('duels : on touche la préférée, puis le résumé permet d’en garder pl
   await modal.getByRole('button', { name: 'Fermer' }).click();
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 2 groupes sur 2');
   await expect(page.getByTestId('group').first()).toContainText('Trié');
+  await page.screenshot({ path: join(SHOTS, `resultats-${info.project.name}.png`) });
+});
+
+test('plein écran pendant un duel, flèches pour passer aux autres photos du groupe', async ({ page }) => {
+  await analyze(page);
+  await openSorter(page, 'Duels');
+  const s = sorter(page);
+  await s.getByRole('button', { name: 'Passer' }).click();
+  await expect(s.getByText('Duel 1 sur 2')).toBeVisible();
+  await s.getByRole('button', { name: 'Plein écran' }).first().click();
+  const viewer = page.getByRole('dialog', { name: 'plage.jpg' });
+  await expect(viewer).toContainText('1 / 3');
+  await viewer.getByRole('button', { name: 'Suivante' }).click();
+  await expect(page.getByRole('dialog', { name: 'IMG-20240714-WA0001.jpg' })).toContainText('2 / 3');
+  await page.keyboard.press('Escape');
+  await expect(s.getByText('Duel 1 sur 2')).toBeVisible();
 });
 
 test('grille : tout garder, passer un groupe, le revoir à la fin', async ({ page }, info) => {
@@ -84,8 +102,8 @@ test('grille : tout garder, passer un groupe, le revoir à la fin', async ({ pag
   await expect(s.getByRole('button', { name: /Supprimer/ })).toHaveCount(0);
   await s.getByRole('button', { name: 'Revoir les groupes passés' }).click();
   await expect(s.getByText('Groupe 2 sur 2')).toBeVisible();
-  // Agrandir : la visionneuse, avec le choix de la photo.
-  await s.getByRole('button', { name: 'Agrandir' }).nth(1).click();
+  // Plein écran : la visionneuse, avec le choix de la photo.
+  await s.getByRole('button', { name: 'Plein écran' }).nth(1).click();
   const viewer = page.getByRole('dialog', { name: 'IMG-20240714-WA0001.jpg' });
   await expect(viewer.getByRole('button', { name: '✕ À supprimer' })).toBeVisible();
   await viewer.getByRole('button', { name: '✕ À supprimer' }).click();
@@ -118,6 +136,8 @@ test.describe('téléphone en paysage', () => {
   test('duel : photos côte à côte en paysage, l’une sous l’autre en portrait', async ({ page }) => {
     await analyze(page);
     await openSorter(page, 'Duels');
+    await sorter(page).getByRole('button', { name: 'Passer' }).click();
+    await expect(sorter(page).getByText('Duel 1 sur 2')).toBeVisible();
     const photos = sorter(page).locator('.duel-photo');
     let a = (await photos.nth(0).boundingBox())!;
     let b = (await photos.nth(1).boundingBox())!;
@@ -131,7 +151,8 @@ test.describe('téléphone en paysage', () => {
     expect(a.height).toBeGreaterThan(180);
     await page.screenshot({ path: join(SHOTS, 'duel-paysage.png') });
     // Le résumé (grille) tient aussi en paysage, sans défilement horizontal.
-    await sorter(page).getByRole('button', { name: 'chat.jpg' }).click();
+    await sorter(page).getByRole('button', { name: 'plage.jpg' }).click();
+    await sorter(page).getByRole('button', { name: 'plage.jpg' }).click();
     await expect(sorter(page).getByTestId('counts')).toBeVisible();
     await page.screenshot({ path: join(SHOTS, 'resume-paysage.png') });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

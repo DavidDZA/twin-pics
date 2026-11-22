@@ -106,7 +106,7 @@ export const fr = {
     remove: 'Supprimer',
     kept: 'Gardée',
     removed: 'À supprimer',
-    zoom: 'Agrandir',
+    zoom: 'Plein écran',
     gridHelp: 'Choisis les photos à garder : un clic sur une photo la garde ou la supprime.',
     keysHelp: 'Touches 1 à 9 : changer une photo · Entrée : valider.',
     suggestionOnly: 'Garder la suggestion',

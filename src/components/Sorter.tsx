@@ -3,7 +3,9 @@
  * - **Grille** (PC) : tout le groupe à l'écran, la suggestion déjà gardée ; un clic sur une photo la garde ou la
  *   supprime ; touches 1 à 9 et Entrée ;
  * - **Duels** (téléphone) : deux photos à la fois, on touche celle qu'on préfère ; la gagnante affronte la suivante.
- *   À la fin, le résumé du groupe (la grille) permet d'en garder plusieurs, ou aucune, avant de valider.
+ *   À la fin, le résumé du groupe (la grille) permet d'en garder plusieurs, ou aucune, avant de valider. Un groupe de
+ *   deux photos va directement au résumé (un duel n'apporterait rien de plus).
+ * Chaque photo a un bouton « Plein écran » (la visionneuse, flèches pour passer aux autres photos du groupe).
  * Rien n'est supprimé ici : les choix sont retenus, la suppression se fait à la fin (`RemoveDialog`).
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -113,6 +115,9 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
         />
       ) : (
         <div className="sorter-end">
+          <div className="celebrate" aria-hidden="true">
+            {unsortedLeft ? '👀' : '🎉'}
+          </div>
           <p className="lead">{unsortedLeft ? T.sort.endSkipped(unsortedLeft) : T.sort.done}</p>
           <p className="muted">{pending.remove.length ? T.remove.summary(pending.remove.length, bytes(pending.bytes), pending.keep, pending.plans.length) : T.sort.doneNothing}</p>
           <div className="actions-row">
@@ -155,7 +160,8 @@ interface GroupProps {
 
 function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSkip, onValidate }: GroupProps) {
   const [choice, setChoice] = useState<Choice>(() => initialChoice(group, photos, marks));
-  const [duel, setDuel] = useState<Duel | null>(() => (view === 'duel' && !isSorted(group, photos, marks) ? startDuel(group) : null));
+  const canDuel = group.members.length > 2;
+  const [duel, setDuel] = useState<Duel | null>(() => (view === 'duel' && canDuel && !isSorted(group, photos, marks) ? startDuel(group) : null));
   const [viewing, setViewing] = useState<number | null>(null);
   const keys = useMemo(() => group.members.map((i) => photos[i].key), [group, photos]);
   const thumbs = useThumbs(keys);
@@ -222,27 +228,30 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
         {head}
         <p className="muted small hint">{T.sort.duelHelp}</p>
         <ul className="duel-photos">
+          <li className="vs" aria-hidden="true">
+            VS
+          </li>
           {pair.map((i) => {
             const p = photos[i];
             const n = group.members.indexOf(i);
             return (
               <li key={p.key}>
-                <button className="duel-photo" onClick={() => pick(i)} aria-label={p.name}>
-                  <PhotoImage file={files.get(p.key)} thumb={thumbs.get(p.key)} full />
-                  {i === group.best && (
-                    <span className="badge">
-                      {T.group.suggestion} · {T.group.reasons[group.reason]}
-                    </span>
-                  )}
-                </button>
+                <div className="photo-wrap">
+                  <button className="duel-photo" onClick={() => pick(i)} aria-label={p.name}>
+                    <PhotoImage file={files.get(p.key)} thumb={thumbs.get(p.key)} full />
+                    {i === group.best && (
+                      <span className="badge">
+                        {T.group.suggestion} · {T.group.reasons[group.reason]}
+                      </span>
+                    )}
+                  </button>
+                  <FullButton onClick={() => setViewing(n)} />
+                </div>
                 <div className="duel-meta">
                   <span className="name" title={p.path}>
                     {p.name}
                   </span>
                   <span className="muted small">{photoDetails(p, false)}</span>
-                  <button className="link" onClick={() => setViewing(n)}>
-                    {T.sort.zoom}
-                  </button>
                 </div>
               </li>
             );
@@ -278,16 +287,19 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
           const like = likenessText(photos, group, i);
           return (
             <li key={p.key} className={mark} data-testid="sort-photo">
-              <button className="pick" aria-pressed={mark === 'keep'} onClick={() => setChoice((c) => toggle(c, p.key))} aria-label={`${p.name} · ${mark === 'keep' ? T.sort.kept : T.sort.removed}`}>
-                <PhotoImage file={files.get(p.key)} thumb={thumbs.get(p.key)} full={n <= FULL_IMAGES_MAX} />
-                <span className="state">{mark === 'keep' ? `✓ ${T.sort.kept}` : `✕ ${T.sort.removed}`}</span>
-                {i === group.best && (
-                  <span className="badge">
-                    {T.group.suggestion} · {T.group.reasons[group.reason]}
-                  </span>
-                )}
-                {k < 9 && <span className="key">{k + 1}</span>}
-              </button>
+              <div className="photo-wrap">
+                <button className="pick" aria-pressed={mark === 'keep'} onClick={() => setChoice((c) => toggle(c, p.key))} aria-label={`${p.name} · ${mark === 'keep' ? T.sort.kept : T.sort.removed}`}>
+                  <PhotoImage file={files.get(p.key)} thumb={thumbs.get(p.key)} full={n <= FULL_IMAGES_MAX} />
+                  <span className="state">{mark === 'keep' ? `✓ ${T.sort.kept}` : `✕ ${T.sort.removed}`}</span>
+                  {i === group.best && (
+                    <span className="badge">
+                      {T.group.suggestion} · {T.group.reasons[group.reason]}
+                    </span>
+                  )}
+                  {k < 9 && <span className="key">{k + 1}</span>}
+                </button>
+                <FullButton onClick={() => setViewing(k)} />
+              </div>
               <div className="grid-meta">
                 <span className="name" title={p.path}>
                   {p.name}
@@ -297,9 +309,6 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
                 </span>
                 <span className="muted">{photoDetails(p)}</span>
                 {like && <span className="like">{like}</span>}
-                <button className="link" onClick={() => setViewing(k)}>
-                  {T.sort.zoom}
-                </button>
               </div>
             </li>
           );
@@ -321,7 +330,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
           <button className="secondary" onClick={() => setChoice(allAs(group, photos, 'remove'))}>
             {T.sort.removeAll}
           </button>
-          {view === 'duel' && (
+          {view === 'duel' && canDuel && (
             <button className="secondary" onClick={() => setDuel(startDuel(group))}>
               {T.sort.redoDuels}
             </button>
@@ -341,5 +350,14 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
       </div>
       {viewer}
     </div>
+  );
+}
+
+/** Bouton « Plein écran » posé sur la photo (la visionneuse). */
+function FullButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="full-btn" onClick={onClick}>
+      <span aria-hidden="true">⤢</span> {T.sort.zoom}
+    </button>
   );
 }

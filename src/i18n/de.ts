@@ -102,7 +102,7 @@ export const de: Dict = {
     remove: 'Löschen',
     kept: 'Behalten',
     removed: 'Zu löschen',
-    zoom: 'Vergrößern',
+    zoom: 'Vollbild',
     gridHelp: 'Wähle die Fotos, die du behältst: Ein Klick auf ein Foto behält oder löscht es.',
     keysHelp: 'Tasten 1 bis 9: Foto ändern · Eingabe: bestätigen.',
     suggestionOnly: 'Vorschlag behalten',

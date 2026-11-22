@@ -1,0 +1,625 @@
+/*
+ * Habillage « fun » (22/11/2026, version 0.3.1) : les couleurs du logo (bleu et orange) en dégradés, boutons arrondis qui réagissent,
+ * cartes douces, logo animé, « VS » des duels, fête de fin de tri. Chargé après styles.css et sort.css : il ne change
+ * que l'apparence. Les animations s'arrêtent si le système demande moins de mouvement.
+ */
+
+:root {
+  --brand-a: #4f7cff;
+  --brand-b: #ff8a4c;
+  --brand: linear-gradient(135deg, var(--brand-a), var(--brand-b));
+  --brand-soft: linear-gradient(135deg, rgba(79, 124, 255, 0.12), rgba(255, 138, 76, 0.12));
+  --shadow: 0 1px 2px rgba(20, 24, 40, 0.06), 0 6px 18px rgba(20, 24, 40, 0.07);
+  --shadow-lift: 0 2px 4px rgba(20, 24, 40, 0.08), 0 12px 28px rgba(20, 24, 40, 0.12);
+  --radius: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand-a: #6d8fff;
+    --brand-b: #ff9a63;
+    --brand-soft: linear-gradient(135deg, rgba(109, 143, 255, 0.16), rgba(255, 154, 99, 0.14));
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Fond : deux halos aux couleurs du logo. */
+body {
+  background:
+    radial-gradient(900px 500px at 0% -10%, rgba(79, 124, 255, 0.13), transparent 70%),
+    radial-gradient(800px 500px at 100% 0%, rgba(255, 138, 76, 0.12), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* Titre */
+.top h1 {
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+}
+
+.top h1 .logo {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.top h1:hover .logo {
+  transform: rotate(-12deg) scale(1.12);
+}
+
+.lead,
+.top h1 {
+  background: var(--brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.top h1 .logo {
+  -webkit-text-fill-color: initial;
+}
+
+/* Boutons : arrondis, ils réagissent au survol et au clic. */
+button {
+  border-radius: 999px;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+button.secondary:not(:disabled):hover,
+.tabs button:not(:disabled):hover {
+  border-color: var(--brand-a);
+}
+
+button.primary {
+  background: var(--brand);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(79, 124, 255, 0.3);
+}
+
+button.primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(255, 138, 76, 0.35);
+}
+
+button.primary.danger {
+  background: linear-gradient(135deg, #e8455d, #ff8a4c);
+  box-shadow: 0 4px 14px rgba(232, 69, 93, 0.3);
+}
+
+button.link {
+  border-radius: 6px;
+}
+
+.tabs button[aria-selected='true'],
+.toggle.on:not(.good):not(.wrong) {
+  background: var(--brand);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* Cartes */
+.tile,
+.group,
+.settings,
+.option,
+.sort-bar,
+.report,
+.modal {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
+}
+
+.tile::before {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 1.5rem;
+  opacity: 0.9;
+}
+
+.tile:nth-child(1)::before {
+  content: '📸' / '';
+}
+
+.tile:nth-child(2)::before {
+  content: '👯' / '';
+}
+
+.tile:nth-child(3)::before {
+  content: '🗂️' / '';
+}
+
+.tile:nth-child(4)::before {
+  content: '💾' / '';
+}
+
+.tile strong {
+  font-size: 1.6rem;
+  background: var(--brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  width: fit-content;
+}
+
+.group {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.group:hover {
+  box-shadow: var(--shadow-lift);
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: rgba(79, 124, 255, 0.12);
+}
+
+.chip.exact,
+.chip.sorted {
+  background: rgba(47, 143, 91, 0.13);
+}
+
+.chip.similar {
+  background: rgba(194, 106, 26, 0.13);
+}
+
+.thumb {
+  border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+
+.thumb:hover {
+  transform: scale(1.03);
+}
+
+.badge {
+  border-radius: 999px;
+}
+
+.option:has(input:checked) {
+  border-color: var(--brand-a);
+  background-image: var(--brand-soft);
+}
+
+.option input,
+input[type='range'] {
+  accent-color: var(--brand-a);
+}
+
+/* Logo animé : deux photos jumelles. */
+.twins {
+  position: relative;
+  width: 132px;
+  height: 92px;
+  margin: 8px 0 18px;
+}
+
+.scan .twins {
+  margin: 0 auto 18px;
+}
+
+.twin {
+  position: absolute;
+  top: 8px;
+  width: 70px;
+  height: 80px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+.twin.a {
+  left: 6px;
+  background: linear-gradient(160deg, #6f95ff, #3f5fe0);
+  transform: rotate(-8deg);
+  animation: twin-a 3.2s ease-in-out infinite;
+}
+
+.twin.b {
+  left: 54px;
+  background: linear-gradient(160deg, #ffad7d, #ff7a35);
+  transform: rotate(8deg);
+  animation: twin-b 3.2s ease-in-out infinite;
+}
+
+.twin .sun {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.25);
+}
+
+.twin::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: -18px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+@keyframes twin-a {
+  0%,
+  100% {
+    transform: translateX(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateX(18px) rotate(-2deg);
+  }
+}
+
+@keyframes twin-b {
+  0%,
+  100% {
+    transform: translateX(0) rotate(8deg);
+  }
+  50% {
+    transform: translateX(-18px) rotate(2deg);
+  }
+}
+
+.twins.busy .twin.a {
+  animation: shuffle-a 1.4s ease-in-out infinite;
+}
+
+.twins.busy .twin.b {
+  animation: shuffle-b 1.4s ease-in-out infinite;
+}
+
+@keyframes shuffle-a {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-8deg);
+    z-index: 1;
+  }
+  50% {
+    transform: translate(40px, -6px) rotate(6deg);
+    z-index: 2;
+  }
+}
+
+@keyframes shuffle-b {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(8deg);
+    z-index: 2;
+  }
+  50% {
+    transform: translate(-40px, 6px) rotate(-6deg);
+    z-index: 1;
+  }
+}
+
+/* Analyse */
+.bar {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.fill {
+  background: var(--brand);
+  border-radius: 999px;
+}
+
+/* Barre de tri : progression */
+.sort-bar {
+  background-image: var(--brand-soft);
+}
+
+.sort-status {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.meter {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Compte rendu de suppression */
+.report {
+  position: relative;
+  padding-left: 56px;
+  background-image: linear-gradient(135deg, rgba(47, 143, 91, 0.1), rgba(255, 138, 76, 0.08));
+}
+
+.report::before {
+  content: '🎉' / '';
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  font-size: 1.8rem;
+  animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Écran de tri */
+.sorter-bar {
+  background-image: var(--brand-soft);
+}
+
+.sorter-bar .where {
+  font-size: 1.05rem;
+}
+
+.pick,
+.duel-photo {
+  border-radius: 18px;
+  transition:
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.pick img {
+  transition:
+    opacity 0.25s ease,
+    filter 0.25s ease,
+    transform 0.25s ease;
+}
+
+.grid-photos li.remove .pick img {
+  filter: grayscale(0.7);
+  transform: scale(0.96);
+}
+
+.grid-photos li.keep .state {
+  animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pick .state {
+  border-radius: 999px;
+  padding: 3px 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.duel-photo:hover {
+  transform: scale(1.01);
+  border-color: var(--brand-a);
+}
+
+/* Bouton « Plein écran » posé sur la photo */
+.photo-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.full-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  color: #fff;
+  background: rgba(15, 17, 26, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.full-btn:hover {
+  background: rgba(15, 17, 26, 0.82);
+}
+
+/* La suggestion, en bas de la photo, laisse la place au bouton « Plein écran ». */
+.photo-wrap .badge {
+  right: auto;
+  max-width: calc(100% - 150px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* « VS » entre les deux photos du duel */
+.duel-photos {
+  position: relative;
+}
+
+.duel-photos .vs {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-style: italic;
+  color: #fff;
+  background: var(--brand);
+  box-shadow:
+    0 0 0 4px var(--bg),
+    var(--shadow-lift);
+  pointer-events: none;
+}
+
+/* Fin du tri */
+.sorter-end {
+  text-align: center;
+}
+
+.sorter-end .actions-row {
+  justify-content: center;
+}
+
+.celebrate {
+  font-size: 4rem;
+  animation: bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-12px) rotate(-6deg);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Visionneuse : flèches de chaque côté de la photo */
+.viewer-body {
+  position: relative;
+}
+
+.viewer-body img {
+  animation: pop-soft 0.25s ease;
+}
+
+@keyframes pop-soft {
+  from {
+    opacity: 0.3;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.viewer-arrow {
+  position: absolute;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  padding: 0;
+  border: none;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(4px);
+}
+
+.viewer-arrow:hover {
+  background: var(--brand);
+}
+
+.viewer-arrow.left {
+  left: 12px;
+}
+
+.viewer-arrow.right {
+  right: 12px;
+}
+
+.viewer .info-bar {
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .viewer-arrow {
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    font-size: 1.9rem;
+  }
+
+  .viewer-arrow.left {
+    left: 4px;
+  }
+
+  .viewer-arrow.right {
+    right: 4px;
+  }
+
+  .viewer .info-bar .info {
+    display: block;
+  }
+
+  /* Grille au téléphone : vignettes trop étroites, « Plein écran » passe sous la photo. */
+  .sorter-body.grid .photo-wrap {
+    flex-direction: column;
+  }
+
+  .sorter-body.grid .full-btn {
+    position: static;
+    margin-top: 6px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    backdrop-filter: none;
+  }
+
+  .sorter-body.grid .photo-wrap .badge {
+    right: 6px;
+    max-width: none;
+  }
+
+  .tile::before {
+    font-size: 1.2rem;
+  }
+
+  .duel-photos .vs {
+    width: 42px;
+    height: 42px;
+    margin: -21px 0 0 -21px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Moins de mouvement si le système le demande. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { T, bytes, duration, num } from '../i18n';
 import type { Progress } from '../lib/scan';
+import { TwinCards } from './TwinCards';
 
 type Shown = Progress | { phase: 'listing'; done: number; total: 0 };
 
@@ -30,6 +31,7 @@ export function ScanScreen({ progress, onStop }: { progress: Shown; onStop: () =
 
   return (
     <section className="scan" aria-live="polite">
+      <TwinCards busy />
       <h2>{LABELS[phase]}…</h2>
       <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ratio * 100)}>
         <div className={total ? 'fill' : 'fill busy'} style={total ? { width: `${ratio * 100}%` } : undefined} />

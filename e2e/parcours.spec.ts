@@ -85,10 +85,33 @@ test('visionneuse : photo en grand, suivante, fermeture', async ({ page }) => {
   await expect(viewer).toBeVisible();
   await expect(viewer.locator('img')).toBeVisible();
   await expect(viewer).toContainText('1 / 2');
-  await viewer.getByRole('button', { name: /Suivante/ }).click();
+  // Flèches à gauche et à droite de la photo.
+  const next = viewer.getByRole('button', { name: 'Suivante' });
+  const prev = viewer.getByRole('button', { name: 'Précédente' });
+  const img = (await viewer.locator('.viewer-body img').boundingBox())!;
+  expect((await prev.boundingBox())!.x).toBeLessThan(img.x + img.width / 2);
+  expect((await next.boundingBox())!.x).toBeGreaterThan(img.x + img.width / 2);
+  await next.click();
+  await expect(viewer).toContainText('2 / 2');
+  await prev.click();
+  await expect(viewer).toContainText('1 / 2');
+  await page.keyboard.press('ArrowRight');
   await expect(viewer).toContainText('2 / 2');
   await page.keyboard.press('Escape');
   await expect(viewer).toBeHidden();
+});
+
+test('visionneuse au téléphone : glisser le doigt passe à la photo suivante', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'téléphone seulement');
+  await analyze(page);
+  await page.getByTestId('group').first().locator('.thumb').first().click();
+  const viewer = page.getByRole('dialog');
+  await expect(viewer).toContainText('1 / 2');
+  const body = viewer.locator('.viewer-body');
+  const touch = (x: number) => [{ identifier: 0, clientX: x, clientY: 300 }];
+  await body.dispatchEvent('touchstart', { touches: touch(300), changedTouches: touch(300) });
+  await body.dispatchEvent('touchend', { touches: [], changedTouches: touch(120) });
+  await expect(viewer).toContainText('2 / 2');
 });
 
 test('miniatures affichées, aucune barre de défilement horizontale', async ({ page }) => {

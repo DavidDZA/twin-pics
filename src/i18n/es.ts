@@ -105,7 +105,7 @@ export const es: Dict = {
     remove: 'Borrar',
     kept: 'Conservada',
     removed: 'Para borrar',
-    zoom: 'Ampliar',
+    zoom: 'Pantalla completa',
     gridHelp: 'Elige las fotos que quieres conservar: un clic en una foto la conserva o la borra.',
     keysHelp: 'Teclas 1 a 9: cambiar una foto · Intro: confirmar.',
     suggestionOnly: 'Conservar la sugerencia',

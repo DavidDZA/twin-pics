@@ -4,7 +4,7 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.3, 22/11/2026) : un exe pour Windows qui trouve les groupes de doublons d'un dossier,
+**État : appli PC** (version 0.3.1, 22/11/2026) : un exe pour Windows qui trouve les groupes de doublons d'un dossier,
 les fait trier (garder une photo, plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le
 site web reste là pour essayer (il trouve et trie, il ne supprime pas). L'appli Android viendra ensuite.
 
@@ -22,7 +22,7 @@ ces réponses serviront à choisir les meilleurs réglages.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin Pics 0.3.0.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.3.1.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest) (rien à installer). Windows peut afficher
    « Windows a protégé votre ordinateur » (appli non signée) : *Informations complémentaires → Exécuter quand même*.
    Pour essayer sans rien installer : le [site](https://daviddza.github.io/twin-pics/), dans Chrome ou Edge.
@@ -34,8 +34,10 @@ ces réponses serviront à choisir les meilleurs réglages.
    - **Grille** (PC) : tout le groupe à l'écran ; un clic sur une photo la garde ou la supprime (touches 1 à 9,
      Entrée pour valider) ; « Garder la suggestion », « Tout garder », « Tout supprimer », « Passer » ;
    - **Duels** (téléphone) : deux photos à la fois, on touche celle qu'on préfère, la gagnante affronte la suivante ;
-     à la fin, le résumé du groupe permet d'en garder d'autres avant de valider. En paysage, les deux photos sont
-     côte à côte.
+     à la fin, le résumé du groupe permet d'en garder d'autres avant de valider. Un groupe de deux photos va
+     directement au résumé. En paysage, les deux photos sont côte à côte.
+   Chaque photo a un bouton **« Plein écran »** ; en plein écran, les flèches à gauche et à droite (ou le clavier, ou
+   glisser le doigt) passent aux autres photos du groupe.
    Le tri est retenu, même si on ferme l'appli.
 4. **Supprimer n photos** : une fenêtre récapitule, groupe par groupe, ce qui est gardé et supprimé (et prévient si un
    groupe n'en garde aucune). Les photos vont, au choix, dans la **Corbeille de Windows** ou dans un **dossier « À

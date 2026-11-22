@@ -218,7 +218,12 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
 
       {groups.length > 0 && (
         <div className="sort-bar">
-          <span data-testid="sort-progress">{T.sort.progress(sortedCount, groups.length)}</span>
+          <span className="sort-status">
+            <span data-testid="sort-progress">{T.sort.progress(sortedCount, groups.length)}</span>
+            <span className="meter" aria-hidden="true">
+              <span style={{ width: `${(100 * sortedCount) / groups.length}%` }} />
+            </span>
+          </span>
           <button className="primary" onClick={() => startSorting(visible)}>
             {sortedCount ? T.sort.resume : T.sort.start}
           </button>

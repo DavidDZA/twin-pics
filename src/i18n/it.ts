@@ -104,7 +104,7 @@ export const it: Dict = {
     remove: 'Elimina',
     kept: 'Tenuta',
     removed: 'Da eliminare',
-    zoom: 'Ingrandisci',
+    zoom: 'Schermo intero',
     gridHelp: 'Scegli le foto da tenere: un clic su una foto la tiene o la elimina.',
     keysHelp: 'Tasti da 1 a 9: cambia una foto · Invio: conferma.',
     suggestionOnly: 'Tieni il suggerimento',
