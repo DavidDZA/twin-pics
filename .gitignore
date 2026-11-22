@@ -10,3 +10,7 @@ e2e/.photos
 
 # Photos personnelles de l'utilisateur pour essayer l'appli : jamais dans le dépôt
 photos test/
+
+# Appli PC construite
+dist-electron
+release

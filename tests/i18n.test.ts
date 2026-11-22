@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DICTS, LANGS, bytes, deviceLang, duration } from '../src/i18n';
+import { REMOVE_DIR_PREFIX, isSkippedDir } from '../src/lib/filetypes';
 
 type Tree = { [k: string]: unknown };
 
@@ -29,8 +30,8 @@ describe('traduction', () => {
 
   it.each(LANGS.filter((l) => l !== 'fr'))('%s : aucun texte resté en français', (lang) => {
     const dict = walk(DICTS[lang]);
-    // Mots qui s'écrivent vraiment pareil : « Suggestion » et « 1 photo » en anglais, « l’originale » en italien.
-    const sameForReal = new Set(['en:group.suggestion', 'en:group.photos', 'it:group.reasons.original']);
+    // Mots qui s'écrivent vraiment pareil : « Suggestion », « 1 photo » et « Duels » en anglais, « l’originale » en italien.
+    const sameForReal = new Set(['en:group.suggestion', 'en:group.photos', 'en:sort.duels', 'it:group.reasons.original']);
     const same = [...dict].filter(([key, texts]) => texts[0] === fr.get(key)![0] && /[a-zà-ÿ]{4,}/i.test(texts[0]) && !sameForReal.has(`${lang}:${key}`));
     expect(same.map(([k]) => k)).toEqual([]);
   });
@@ -42,8 +43,13 @@ describe('traduction', () => {
   });
 
   it('les phrases « non analysés » n’ont que les parties utiles', () => {
-    expect(DICTS.fr.results.skipped(0, 2, 0)).toBe('Non analysés : 2 photos HEIC (iPhone), que le navigateur ne sait pas ouvrir.');
+    expect(DICTS.fr.results.skipped(0, 2, 0)).toBe('Non analysés : 2 photos HEIC (iPhone), pas encore prises en charge.');
     expect(DICTS.en.results.skipped(1, 0, 3)).toBe('Not analyzed: 1 unreadable photo, 3 videos.');
+  });
+
+  it.each(LANGS)('%s : le dossier « À supprimer » n’est jamais analysé', (lang) => {
+    expect(DICTS[lang].remove.folderName.startsWith(REMOVE_DIR_PREFIX)).toBe(true);
+    expect(isSkippedDir(DICTS[lang].remove.folderName)).toBe(true);
   });
 
   it('langue de l’appareil, sinon l’anglais', () => {

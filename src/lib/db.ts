@@ -6,10 +6,12 @@
  *   d'un dossier déjà vu prend quelques secondes.
  * - `thumbs` : miniatures JPEG (200 px), à part pour garder `photos` légère.
  * - `labels` : les réponses « bien trouvé » / « pas des doublons » sur les groupes, pour régler les seuils.
+ * - `marks` : le tri, photo par photo (« garder » / « supprimer »), retenu jusqu'à la suppression (`choices.ts`).
  * - `meta` : dernier dossier ouvert (son accès, avec la File System Access API), réglages.
  */
 import Dexie, { type Table } from 'dexie';
 import type { Kind, Params } from './groups';
+import type { Mark } from './choices';
 
 export interface PhotoRow {
   key: string;
@@ -46,6 +48,15 @@ export interface LabelRow {
   at: number;
 }
 
+/** Le tri d'une photo : à garder ou à supprimer (version 2 de la base). */
+export interface MarkRow {
+  key: string;
+  mark: Mark;
+  /** Groupe dans lequel elle a été triée. */
+  groupId: string;
+  at: number;
+}
+
 export interface MetaRow {
   key: string;
   value: unknown;
@@ -56,6 +67,7 @@ class TwinPicsDB extends Dexie {
   thumbs!: Table<ThumbRow, string>;
   labels!: Table<LabelRow, string>;
   meta!: Table<MetaRow, string>;
+  marks!: Table<MarkRow, string>;
 
   constructor() {
     super('twin-pics');
@@ -65,6 +77,7 @@ class TwinPicsDB extends Dexie {
       labels: '&groupId, verdict',
       meta: '&key',
     });
+    this.version(2).stores({ marks: '&key, groupId' });
   }
 }
 

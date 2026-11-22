@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 20/11/2026. Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 22/11/2026. Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -14,14 +14,33 @@
 > (21/11) Essai de la version 0.2 par l'utilisateur sur ses vraies photos : **« la détection a super bien marché »**.
 > Projet mis en pause, à reprendre plus tard.
 >
-> **Reprendre ici** : appli PC utilisable (§ 3 : trier par duels ou grille, dossier « À supprimer », ménage des
-> copies exactes). Les seuils par défaut (§ 2) peuvent rester tels quels tant que la détection convient.
+> (22/11) **Version 0.3, appli PC** (décisions § 1.1) : exe portable (Electron), le site gardé pour essayer ; tri en
+> **grille** (PC) ou en **duels** (téléphone, portrait et paysage), bouton pour passer de l'un à l'autre ; garder une
+> photo, plusieurs ou aucune ; fenêtre « Avant de supprimer » ; Corbeille de Windows ou dossier « À supprimer » au
+> choix, annulable ; tri retenu entre deux lancements. ARCHITECTURE § 2.1 et § 4.
+>
+> **Reprendre ici** : retour de l'utilisateur sur l'exe (télécharger `Twin Pics 0.3.0.exe` dans les *Releases*,
+> l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Puis § 3 (ménage des
+> copies exactes en un bouton…) ou § 5.3 (appli Android).
 
 ## 1. Décisions prises (20/11/2026)
 
 - Photos de l'utilisateur : **dossiers du PC**, **galerie du téléphone**, **Google Photos**.
 - Appli **publiée** : dépôt public, open source (MIT), 6 langues, Play Store plus tard.
 - On commence par le **prototype PC**. Nom : **Twin Pics**.
+
+### 1.1 Décisions du 22/11/2026
+
+- **PC : un exe** (Electron), pas un site ; le site reste pour les essais (il ne supprime pas).
+- **Android : Capacitor** (§ 5.3).
+- **Deux façons de trier**, avec un bouton pour passer de l'une à l'autre : **grille** sur PC (tout le groupe à
+  l'écran, plus de place), **duels** sur téléphone. Sur Android, penser au **paysage** (pour regarder les photos).
+- Cas de base : **garder une seule photo** ; possible d'en garder plusieurs, ou de toutes les supprimer.
+- **Récapitulatif** avant de supprimer vraiment (ce qui est gardé / supprimé).
+- Questions posées le 22/11, réponses : photos supprimées **au choix** (Corbeille de Windows ou dossier « À
+  supprimer ») ; grille = **tout le groupe d'un coup** (pas 4 par 4 en séries) ; duels = **duel simple + résumé** (le
+  duel choisit la meilleure, garder plusieurs ou aucune se fait dans le résumé du groupe) ; suppression **à la fin, en
+  une fois** (pas après chaque groupe).
 
 ## 2. Mesurer la détection sur les vraies photos (prochaine étape)
 
@@ -37,12 +56,17 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 
 ## 3. Appli PC utilisable
 
-- **Trier** : duels dans un groupe (la gagnante affronte la suivante), grille « touche celles à garder », « garder la
-  suggestion » en un geste, « tout supprimer », « passer ».
-- **Supprimer sans risque** : déplacer dans un dossier « À supprimer » choisi par l'utilisateur (une appli web efface
-  définitivement, sans corbeille Windows) ; récapitulatif avant d'appliquer (« 37 photos, 412 Mo ») ; annulation.
-  Demande l'accès en écriture au dossier (`mode: 'readwrite'`).
-- **Ménage des copies exactes** en un bouton, avec la copie à garder choisie par règle (dossier d'origine).
+- ~~**Trier** : duels, grille, « garder la suggestion », « tout supprimer », « passer »~~ — fait le 22/11 (0.3).
+- ~~**Supprimer sans risque** : Corbeille de Windows ou dossier « À supprimer », récapitulatif, annulation~~ — fait le
+  22/11 (0.3), dans l'appli PC seulement. Annulation : seulement pour le dossier « À supprimer », juste après (la
+  Corbeille se vide ou se restaure depuis Windows).
+- **Ménage des copies exactes** en un bouton : marquer tous les groupes « copies exactes » non triés avec la
+  suggestion seule (l'originale), puis la fenêtre « Avant de supprimer ».
+- Site : supprimer aussi (dossier « À supprimer » par la File System Access API en écriture) ? Pas utile tant que le
+  site ne sert qu'aux essais.
+- Exe : signature de code (évite l'avertissement de Windows, payante) ; mise à jour automatique (electron-updater et
+  les *Releases*) ; installateur plutôt que portable si l'utilisateur le préfère.
+- HEIC dans l'appli PC : décodage par le processus principal (sharp / libheif) au lieu du navigateur.
 - Groupes « pas des doublons » qui ne reviennent plus.
 - Stats et badges (place libérée, photos triées), astuces de première visite (comme Rank It All).
 - PWA (installable, hors ligne).
@@ -66,8 +90,20 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
    publique ; jusqu'à 100 testeurs déclarés sans.
 2. **Google Photos** : l'API ne donne plus la bibliothèque depuis le 31/03/2025 ; passer par les copies du téléphone,
    ou un export **Google Takeout** sur le PC (que le prototype sait déjà lire comme un dossier).
-3. **Android** : appli native (Capacitor + module natif MediaStore, corbeille système d'Android 11+), déclaration de
-   la permission photos sur le Play Store (fonction principale de l'appli : autorisée), test fermé de 14 jours.
+3. **Android** (décidé le 22/11 : **Capacitor**) : la même interface (React) dans une WebView, avec un module natif
+   (Kotlin) pour la galerie :
+   - liste des photos par **MediaStore** (`READ_MEDIA_IMAGES`, Android 13+ ; accès partiel « photos choisies » à
+     gérer), lecture des fichiers par un chemin servi à la WebView (comme `app://` sur PC) ;
+   - suppression par la **corbeille système** (`MediaStore.createTrashRequest`, Android 11+ : une seule
+     confirmation d'Android pour tout le lot, récupérable 30 jours dans Google Photos / la galerie) ;
+   - nouvelle plateforme dans `src/platform/` (à côté de `desktop`) ; duels par défaut ; paysage déjà prêt (§ 4.1
+     d'ARCHITECTURE) ;
+   - à vérifier tôt : WebGPU dans la WebView Android (sinon modèle sur le processeur, plus lent), mémoire avec
+     10 000 photos, vitesse de décodage sur téléphone ;
+   - publication : le téléphone de l'utilisateur est professionnel (pas d'APK hors magasin) → test interne de la Play
+     Console dès les premiers essais (comme Rank It All), déclaration de la permission photos (fonction principale :
+     autorisée), test fermé de 14 jours avant la production. Compilation par GitHub Actions (rien à installer sur le
+     PC), comme l'AAB de Rank It All.
 4. iPhone (PhotoKit), plus tard.
 
 ## 6. Plus tard

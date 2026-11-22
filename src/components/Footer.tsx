@@ -1,4 +1,5 @@
 import { LANG, LANG_NAMES, LANGS, T, setLanguage, type Lang } from '../i18n';
+import { RELEASES_URL, desktop } from '../platform';
 
 export function Footer() {
   return (
@@ -13,9 +14,16 @@ export function Footer() {
           ))}
         </select>
       </label>
-      <a href="https://github.com/DavidDZA/twin-pics" target="_blank" rel="noreferrer">
-        GitHub
-      </a>
+      <span className="links">
+        {!desktop && (
+          <a href={RELEASES_URL} target="_blank" rel="noreferrer">
+            {T.app.getPc}
+          </a>
+        )}
+        <a href="https://github.com/DavidDZA/twin-pics" target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+      </span>
     </footer>
   );
 }

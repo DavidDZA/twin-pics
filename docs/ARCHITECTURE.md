@@ -1,44 +1,65 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 21/11/2026 (prototype PC, version 0.2 : analyse
-> 4 fois plus rapide, § 3). Ce qui
-> reste à faire est dans [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
+> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.3 : appli PC en exe,
+> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4). Ce qui reste à faire est dans
+> [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
 > choix) est dans `DavidDZA\IDEES-APPLIS.md`, idée 1.
 
 ## 1. L'appli
 
-Une page web (Chrome, Edge) : on choisit un dossier de photos, elle trouve les groupes de doublons et propose la
-photo à garder. **Rien ne quitte l'ordinateur** : les photos sont lues et analysées dans le navigateur ; seul le
-modèle des photos similaires est téléchargé (une fois). Le prototype ne supprime rien.
+On choisit un dossier de photos, l'appli trouve les groupes de doublons, propose la photo à garder, fait trier
+chaque groupe et supprime ce qui doit l'être après un récapitulatif. **Rien ne quitte l'ordinateur** : les photos sont
+lues et analysées sur place ; seul le modèle des photos similaires est téléchargé (une fois).
+
+Une seule interface (React), sous trois formes (`src/platform/`) :
+
+- **Appli PC** (Windows, exe portable, Electron, § 2.1) : la vraie appli. Elle seule supprime des photos.
+- **Site** (GitHub Pages, Chrome ou Edge) : pour essayer. Il trouve et trie ; la fenêtre « Avant de supprimer » y
+  explique que la suppression se fait dans l'appli PC (lien vers les *Releases*).
+- **Android** (Capacitor) : à venir (ROADMAP § 5).
 
 Trois écrans (`App.tsx`) :
 
-- **Départ** (`StartScreen`) : « Choisir un dossier de photos », « Reprendre « dossier » » (le dernier dossier, s'il a
-  été choisi avec la File System Access API), case « Chercher aussi les photos similaires » (retenue :
-  `opt-similar`, localStorage).
+- **Départ** (`StartScreen`) : « Choisir un dossier de photos », « Reprendre « dossier » » (le dernier dossier : son
+  chemin dans l'appli PC, son accès File System Access API sur le site), case « Chercher aussi les photos
+  similaires » (retenue : `opt-similar`, localStorage). Sur le site, une ligne renvoie vers l'appli PC.
 - **Analyse** (`ScanScreen`) : étape en cours, barre de progression, temps restant estimé, « Arrêter ».
-- **Résultats** (`Results`) : 4 cases (photos analysées, groupes, photos en trop, place récupérable), ce qui n'a pas
-  été analysé, réglages de la détection (`SettingsPanel`, curseurs, retenus : `detect-params`), onglets par niveau,
-  groupes (`GroupCard`, 30 puis « Voir plus »), visionneuse (`Viewer` : le fichier d'origine en grand, flèches,
-  Échap).
+- **Résultats** (`Results`) : 4 cases (photos analysées, groupes, photos en trop, place récupérable), barre de tri
+  (« Triés : n groupes sur N », « Trier les doublons » / « Continuer le tri », « Supprimer n photos (taille)… »),
+  compte rendu de la dernière suppression, ce qui n'a pas été analysé, réglages de la détection (`SettingsPanel`,
+  curseurs, retenus : `detect-params`), onglets par niveau, groupes (`GroupCard`, 30 puis « Voir plus » : état du tri
+  photo par photo, « Trier ce groupe » / « Modifier le tri », « Bien trouvé » / « Pas des doublons »), visionneuse
+  (`Viewer` : le fichier d'origine en grand, flèches, Échap ; pendant le tri, le choix « Gardée » / « À supprimer »
+  de la photo).
+- Par-dessus les résultats : l'**écran de tri** (`Sorter`, plein écran) et la fenêtre **« Avant de supprimer »**
+  (`RemoveDialog`), § 4.
 
 ## 2. Technique
 
 | Élément | Choix |
 |---|---|
-| Front | Vite, React 19, TypeScript, un seul fichier CSS (`src/styles.css`, thème clair / sombre selon l'appareil) |
-| Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta` |
-| Lecture du dossier | **File System Access API** (`showDirectoryPicker`, Chrome / Edge) ; sinon champ `webkitdirectory` (`files.ts`) |
+| Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil) et `src/sort.css` (tri, suppression) |
+| Appli PC | **Electron** 45 (`electron/`, construit par esbuild), exe portable par **electron-builder** (`npm run dist`, workflow `release.yml`) : § 2.1 |
+| Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta`, `marks` |
+| Lecture du dossier | Appli PC : le processus principal liste le dossier (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
 | Analyse | fichiers lus par la page (2 à la fois), analysés dans des workers (`analyze.worker.ts`), un par cœur moins un (6 au plus) ; EXIF par **exifr** |
 | Photos similaires | **Transformers.js** + ONNX Runtime Web, modèle `onnx-community/dinov2-small` : carte graphique (WebGPU, `fp16`, 44 Mo), sinon processeur (WebAssembly, `q8`, 24 Mo) |
-| Hébergement | **GitHub Pages** (`https://daviddza.github.io/twin-pics/`), déployé à chaque push sur `main` |
-| Tests | **Vitest** (`tests/`, Node : empreintes sur des images générées par sharp, regroupement, traductions) ; **Playwright** (`e2e/`, appli construite, Chrome installé, téléphone et PC) |
+| Hébergement | Site : **GitHub Pages** (`https://daviddza.github.io/twin-pics/`), déployé à chaque push sur `main`. Appli PC : *Releases* GitHub, une par version de `package.json` |
+| Tests | **Vitest** (`tests/`, Node : empreintes, regroupement, tri, liste et suppression de l'appli PC sur un vrai dossier temporaire, traductions) ; **Playwright** (`e2e/` : le site, Chrome installé, téléphone et PC ; `e2e-pc/` : la vraie appli Electron ou l'exe) |
 
 ```
+electron/            appli PC (processus principal, Node) : construit en dist-electron/ par scripts/build-electron.mjs
+  main.ts              fenêtre, protocole app://twin-pics/, échanges avec l'interface (IPC)
+  preload.ts           window.twinPics (types : src/platform/bridge.ts)
+  list.ts              liste d'un dossier ; remove.ts : Corbeille, dossier « À supprimer », annulation ; paths.ts
 src/
   App.tsx            les trois écrans, lancement de l'analyse
+  platform/          site ou appli PC : index.ts (desktop, liste, réglages de suppression), bridge.ts (window.twinPics)
   lib/
-    files.ts           lecture du dossier (deux méthodes), types de fichiers
+    files.ts           une photo trouvée (FoundFile), lecture du dossier sur le site
+    filetypes.ts       types de fichiers, dossiers ignorés (partagé avec electron/)
+    choices.ts         le tri : garder / supprimer, photos à supprimer, duels (code pur)
+    display.ts         chemins affichés à partir du dossier analysé
     scan.ts            l'analyse de bout en bout (base, lecture, workers, modèle, paires)
     pool.ts            limiter les tâches simultanées (Limiter), faire travailler des workers (WorkerPool)
     analyze.worker.ts  une photo : EXIF, décodage, dHash, netteté, miniature, SHA-256, entrée du modèle
@@ -47,11 +68,35 @@ src/
     imagehash.ts       dHash, Hamming, netteté, cosinus : code pur, testé sous Node
     groups.ts          paires candidates, groupes, suggestion : code pur
     db.ts model.ts messages.ts
-  components/        écrans et briques (GroupCard, SettingsPanel, Viewer, useThumbs…)
+  components/        écrans et briques (GroupCard, Sorter, RemoveDialog, SettingsPanel, Viewer, PhotoImage…)
   i18n/              un dictionnaire par langue (fr.ts en référence)
-tests/  e2e/         Vitest, Playwright (e2e/photos.ts génère le dossier d'essai)
+tests/  e2e/  e2e-pc/  Vitest, Playwright site, Playwright appli PC (e2e/photos.ts génère le dossier d'essai)
+scripts/             construction et lancement de l'appli PC, icône (build/icon.ico, depuis public/favicon.svg)
 tools/vitesse/       banc de mesure de vitesse (décodage, modèle sur processeur ou carte graphique), § 3.5
 ```
+
+### 2.1 Appli PC (Electron)
+
+Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disque (Corbeille de Windows, dossier
+« À supprimer », pas de permission à redonner à chaque lancement). Même modèle que My Concert Setlists : exe
+**portable** (rien à installer, non signé), construit et publié par GitHub Actions.
+
+- **L'interface est le site construit** (`dist/`), servie par le protocole `app://twin-pics/` (`protocol.handle`,
+  schéma déclaré `standard` et `secure`) : une origine stable où marchent IndexedDB, les workers en module, le cache
+  du modèle (Cache Storage) et la carte graphique (WebGPU, vérifié : « calculées par la carte graphique »). En
+  développement (`npm run dev:pc`), elle vient de Vite (`VITE_DEV_URL`).
+- **Photos** : `app://twin-pics/_photo/<chemin>` ; le processus principal ne sert que les fichiers des dossiers
+  choisis pendant la session (`roots`). Les chemins sont complets, avec des « / » (`F:/Photos/a.jpg`) ; ils servent
+  aussi de clé (`photoKey`). Affichés à partir du dossier analysé (`display.ts`), complets dans l'infobulle.
+- **Pont** (`preload.ts`, `contextIsolation`, `sandbox`) : `window.twinPics` = choisir un dossier, dernier dossier
+  (`reglages.json` dans le dossier de l'appli), lister, choisir le dossier « À supprimer », supprimer, annuler, ouvrir
+  l'Explorateur, ouvrir un lien. Les liens `target="_blank"` s'ouvrent dans le navigateur.
+- **Une seule fenêtre** (`requestSingleInstanceLock`) : deux appli ouvertes se disputeraient la base locale.
+- **Paquet** : toutes les dépendances sont des `devDependencies` (l'interface est empaquetée par Vite) : l'exe
+  n'embarque aucun `node_modules` (≈ 110 Mo, Electron compris).
+- Variables d'environnement des tests : `TP_USER_DATA` (dossier de l'appli), `TP_PICK_FOLDER` /
+  `TP_PICK_REMOVE_FOLDER` (réponses des fenêtres de choix de dossier), `TP_FAKE_TRASH` (dossier qui remplace la
+  Corbeille), `TP_FAKE_TRASH_FAIL` (Corbeille refusée, comme sur une clé USB).
 
 ## 3. L'analyse (`scan.ts`)
 
@@ -144,7 +189,8 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
   date EXIF, appareil, erreur, vecteur et nom du modèle).
 - `thumbs` : miniatures (≈ 10 Ko chacune ; à surveiller pour 50 000 photos : ROADMAP).
 - `labels` : réponses sur les groupes (`groupId`, verdict `good` / `wrong`, nature, clés des photos, réglages du moment).
-- `meta` : `folder` (accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre »).
+- `meta` : `folder` (site : accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre »).
+- `marks` (version 2 de la base) : le tri, photo par photo (`key`, `mark` = `keep` / `remove`, `groupId`, date), § 4.
 
 ### 3.5 Vitesse (21/11/2026)
 
@@ -166,7 +212,55 @@ Appli entière, 60 photos datées de 12 Mpx sur SSD : **372 ms par photo en vers
 rapide). Sur un disque dur, la lecture des fichiers devient la limite (56 Go à ≈ 60 Mo/s ≈ 15 min), lue une seule
 fois au lieu de deux.
 
-## 4. Traduction
+## 4. Tri et suppression
+
+Demandé le 22/11/2026 : deux façons de trier, une pour le PC (plus de place) et une pour le téléphone, avec un bouton
+pour passer de l'une à l'autre ; garder une photo (cas de base), plusieurs, ou aucune ; un récapitulatif avant de
+supprimer ; les suppressions faites à la fin, en une fois.
+
+### 4.1 Le tri (`Sorter`, `choices.ts`)
+
+- **Plein écran**, groupe par groupe : « Groupe i sur N », nature, nombre de photos, date, « n gardées, n à supprimer ».
+  Bouton **« Affichage : Grille | Duels »** (retenu : `sort-view` ; par défaut, duels si l'écran est tactile ou petit,
+  grille sinon). « Retour aux groupes » ferme.
+- **Grille** : tout le groupe à l'écran, aussi grand que possible (2 colonnes jusqu'à 4 photos, 3 jusqu'à 9, puis 4 ;
+  les lignes se partagent la hauteur), la suggestion gardée et les autres à supprimer (`suggestionOnly`). Un clic sur
+  une photo change son choix (cadre vert plein « ✓ Gardée » / rouge pointillé « ✕ À supprimer », photo pâlie) ;
+  touches 1 à 9 et Entrée ; « Agrandir » ouvre la visionneuse (où le choix se change aussi). Boutons « Garder la
+  suggestion », « Tout garder », « Tout supprimer » (avertissement « Aucune photo gardée »), « ‹ Précédent »,
+  « Passer », « Valider › ». Les photos d'origine sont affichées jusqu'à 12 par groupe, les miniatures au-delà
+  (`PhotoImage` : la miniature d'abord, puis le fichier).
+- **Duels** (« duel simple + résumé », choix de l'utilisateur) : la suggestion affronte la photo suivante, on touche la
+  préférée, la gagnante affronte la suivante (`startDuel`, `pickWinner`) ; à la fin, le **résumé** du groupe est la
+  grille, avec seulement la gagnante gardée (`onlyKeep`) : c'est là qu'on en garde plusieurs ou aucune, ou « Refaire
+  les duels ». Un groupe déjà trié s'ouvre directement sur son résumé.
+- **Téléphone en paysage** : les deux photos du duel côte à côte, barres compactes, consigne masquée ; le résumé défile
+  et « Valider » reste collé en bas (aussi en portrait).
+- **Retenu** : « Valider » enregistre le choix de chaque photo (`marks`) et passe au groupe suivant **non trié**.
+  « Passer » ne retient rien ; en fin de liste, « Revoir les groupes passés ». Un groupe est trié quand toutes ses
+  photos le sont (`isSorted`) : si les réglages changent et qu'il gagne une photo, il redevient à trier (ses choix
+  restent proposés, `initialChoice`).
+
+### 4.2 La suppression (`RemoveDialog`, `electron/remove.ts`)
+
+- **Ce qui est supprimé** (`pendingRemoval`) : les photos « à supprimer » des groupes **triés** du moment. Une photo
+  marquée qui n'est plus dans aucun groupe (réglages changés) n'est jamais touchée.
+- **« Avant de supprimer »** : « n photos à supprimer (taille), n gardées, dans n groupes », avertissement si des
+  groupes ne gardent aucune photo, la liste des groupes (miniatures « Gardée » / « À supprimer », noms au clic ; 60
+  groupes puis « et n autres groupes »), **« Où vont les photos supprimées »** (liste : Corbeille de Windows ou
+  dossier « À supprimer », retenu : `remove-mode`, `remove-folder`), « Annuler » / « Supprimer n photos ».
+- **Corbeille de Windows** (`shell.trashItem`) : sur un disque sans Corbeille (clé USB), Electron refuse au lieu
+  d'effacer : la photo n'est pas touchée et le compte rendu conseille le dossier « À supprimer ».
+- **Dossier « À supprimer »** : par défaut `<dossier analysé>/Twin Pics - À supprimer` (nom traduit, toujours
+  commencé par `Twin Pics - ` : jamais analysé, `isSkippedDir`), ou un dossier choisi (« Changer… », exclu de
+  l'analyse). Les photos y gardent leurs sous-dossiers, jamais par-dessus un fichier (« plage (2).jpg ») ; d'un disque
+  à l'autre, copie puis effacement. **« Annuler »** juste après les remet à leur place.
+- Envoi par paquets de 20 (progression « Suppression… n / N ») ; le processus principal refuse tout fichier hors du
+  dossier analysé. Ensuite : compte rendu (« n photos supprimées, taille libérée », où elles sont, échecs), les photos
+  disparaissent des groupes (`gone`) et leurs choix sont effacés. Les lignes de `photos` restent (une photo remise à
+  sa place garde la même clé).
+
+## 5. Traduction
 
 6 langues, ton familier. Langue de l'appareil si elle est traduite, sinon l'anglais ; choix en bas de page
 (`app-lang`, localStorage), qui recharge la page. Dictionnaires `src/i18n/*.ts` typés sur `fr.ts` : la compilation
@@ -174,15 +268,22 @@ fois au lieu de deux.
 les mots qui s'écrivent pareil, listés dans le test), pas d'espace avant « : ! ? ; » hors du français. Tailles et
 durées par `Intl` (`bytes`, `duration`).
 
-## 5. Tests
+## 6. Tests
 
-- `npx tsc -b`, `npm test`, `npm run build` avant chaque push ; le déploiement relance `npm test`.
+- `npx tsc -b`, `npm test`, `npm run build`, `npm run e2e`, `npm run e2e:pc` avant chaque push ; le déploiement et la
+  construction de l'exe relancent `npm test`. Après `npm run dist`, `npm run e2e:exe` passe les tests sur l'exe.
 - **Vitest** : empreintes sur des images générées par sharp (`tests/images.ts` : même calcul que le worker, sous
   Node) — copie réduite et recompressée ≤ 4 bits, éclaircie ≤ 6 bits, photos différentes > 16 bits, photo floue (même
   plus claire) moins nette ; regroupement (copies exactes et suggestion de l'originale, quasi identiques selon le
   réglage, images uniformes écartées, similaires selon la ressemblance et l'écart de temps, garde-fou contre les
   chaînes, photos sans date jamais similaires, ordre et identifiant des groupes, photos qui ont besoin du modèle) ;
-  traductions.
+  traductions (dont : le dossier « À supprimer » n'est jamais analysé, dans toutes les langues).
+- **Tri** (`choices.test.ts`) : suggestion seule par défaut, en garder plusieurs ou aucune, groupe trié ou non, choix
+  repris, photos à supprimer et place libérée, « tout supprimer » signalé, photo marquée hors groupe jamais supprimée,
+  duels (la gagnante affronte la suivante, groupe de deux photos).
+- **Appli PC** (`pc.test.ts`, vrai dossier temporaire) : liste (sous-dossiers, HEIC et vidéos comptés, corbeilles et
+  dossier « À supprimer » ignorés), chemins (« .. » refusé), Corbeille (refus = photo intacte), dossier « À supprimer »
+  (sous-dossiers, pas d'écrasement, annulation), photo hors du dossier ou disparue, noms libres.
 - **Outils de parallélisme** (`pool.test.ts`) : jamais plus de tâches simultanées que permis, place libérée après un
   échec, file d'attente du modèle qui bloque l'analyse quand elle est pleine ; une demande à la fois par worker, chaque
   réponse à sa demande, erreur limitée à sa demande, « Arrêter » qui annule tout.
@@ -193,8 +294,18 @@ durées par `Intl` (`bytes`, `duration`).
   anglais. Avec `E2E_MODELE=1` (télécharge le modèle) : rafale trouvée pendant l'analyse, la plus nette proposée, et
 où a tourné le modèle affiché ; même chose sur le processeur forcé ; photos similaires demandées après une analyse
 sans elles (photos déjà vues complétées).
+- **Playwright, tri sur le site** (`e2e/tri.spec.ts`, téléphone et PC) : duels puis résumé (en garder deux), deux
+  duels dans un groupe de trois, fin du tri, fenêtre « Avant de supprimer » sans bouton de suppression mais avec le
+  lien vers l'appli PC ; grille (« Tout garder », « Passer », « Revoir les groupes passés », choix changé dans la
+  visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; téléphone : duel l'une sous l'autre en
+  portrait, côte à côte en paysage (760 × 393), résumé sans défilement horizontal. Captures dans `test-results/`.
+- **Playwright, appli PC** (`npm run e2e:pc`, `e2e-pc/appli.spec.ts`, vraie appli Electron, copie du dossier
+  d'essai) : photos d'origine lues par `app://`, grille, récapitulatif, Corbeille (dossier d'essai), dossier « À
+  supprimer » (sous-dossiers, ignoré par la nouvelle analyse), annulation, disque sans Corbeille, « Tout supprimer »
+  et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant ; avec `E2E_MODELE=1`, photos similaires
+  sur la carte graphique.
 
-## 6. Conventions
+## 7. Conventions
 
 Les mêmes que Rank It All : messages de commit et commentaires en français, sobres ; textes de l'interface jamais en
 dur (dictionnaires, 6 langues) ; un mot plutôt qu'une icône seule ; vérifier les écrans aux formats téléphone et PC ;

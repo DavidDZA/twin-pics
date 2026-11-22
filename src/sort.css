@@ -1,0 +1,575 @@
+/* Tri des groupes (Sorter), fenêtre « Avant de supprimer » (RemoveDialog), compte rendu de suppression. */
+
+button.danger {
+  background: var(--wrong);
+  border-color: var(--wrong);
+  color: #fff;
+}
+
+.warning {
+  color: var(--wrong);
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.note-box {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.sort-bar > span {
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+
+.report {
+  background: var(--surface);
+  border: 1px solid var(--good);
+  border-radius: var(--radius);
+  padding: 4px 12px 12px;
+  margin: 12px 0;
+}
+
+.bottom .links {
+  display: flex;
+  gap: 14px;
+}
+
+/* Liste des groupes : état du tri */
+.chip.sorted {
+  color: var(--good);
+}
+
+.group footer .spacer {
+  flex: 1;
+}
+
+.photos li.remove .thumb {
+  opacity: 0.45;
+}
+
+.mark {
+  font-weight: 600;
+}
+
+.mark.keep {
+  color: var(--good);
+}
+
+.mark.remove {
+  color: var(--wrong);
+}
+
+/* Écran de tri, en plein écran : la page derrière ne défile plus. */
+body:has(.sorter, .modal-back, .viewer) {
+  overflow: hidden;
+}
+
+.sorter {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.sorter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sorter-bar .where {
+  flex: 1;
+}
+
+.view-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-switch .toggle {
+  padding: 6px 12px;
+}
+
+.toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.sorter-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 12px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.sorter-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.hint {
+  margin: 4px 0 8px;
+}
+
+/* Grille : tout le groupe tient à l'écran (colonnes et lignes calculées par le composant). */
+.grid-photos {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  gap: 12px;
+}
+
+.grid-photos li {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pick,
+.duel-photo {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  width: 100%;
+  padding: 0;
+  border: 3px solid var(--good);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--thumb-bg);
+}
+
+.pick img,
+.duel-photo img,
+.pick .placeholder,
+.duel-photo .placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.grid-photos li.remove .pick {
+  border-color: var(--wrong);
+  border-style: dashed;
+}
+
+.grid-photos li.remove .pick img {
+  opacity: 0.4;
+}
+
+.pick .state {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: #fff;
+  background: var(--good);
+}
+
+.grid-photos li.remove .state {
+  background: var(--wrong);
+}
+
+.pick .key {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 24px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.grid-meta,
+.duel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  font-size: 0.8rem;
+  padding-top: 4px;
+  min-width: 0;
+}
+
+.grid-meta span,
+.duel-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.grid-meta .name,
+.duel-meta .name {
+  font-weight: 600;
+}
+
+.grid-meta .like {
+  color: var(--accent);
+}
+
+.grid-meta .link,
+.duel-meta .link {
+  margin-left: auto;
+  padding: 0 2px;
+  font-size: 0.85rem;
+}
+
+.sorter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.sorter-actions .quick,
+.sorter-actions .nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sorter-actions .nav {
+  margin-left: auto;
+}
+
+.sorter-end {
+  max-width: 640px;
+  margin: 40px auto;
+  padding: 0 16px;
+}
+
+/* Duels : l'une au-dessus de l'autre en portrait, côte à côte en paysage. */
+.duel-photos {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.duel-photos li {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.duel-photo {
+  border-color: var(--border);
+}
+
+.duel-photo:active,
+.duel-photo:focus-visible {
+  border-color: var(--accent);
+}
+
+@media (orientation: landscape) {
+  .duel-photos {
+    flex-direction: row;
+  }
+
+  .duel-photos li {
+    min-width: 0;
+  }
+}
+
+/* Fenêtre « Avant de supprimer » */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+  background: rgba(8, 9, 12, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 18px 16px;
+  width: min(760px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.plans {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+  flex: 1;
+  min-height: 60px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.plan {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.plan-photos {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-photos li {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--thumb-bg);
+  border: 2px solid var(--good);
+}
+
+.plan-photos li.remove {
+  border-color: var(--wrong);
+  border-style: dashed;
+}
+
+.plan-photos img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.plan-photos li.remove img {
+  opacity: 0.45;
+}
+
+.plan-photos .state {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  background: var(--good);
+}
+
+.plan-photos li.remove .state {
+  background: var(--wrong);
+}
+
+.plan-names {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  word-break: break-all;
+}
+
+.modal .where {
+  margin: 10px 0 0;
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-weight: 600;
+}
+
+.folder-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+
+.folder-choice code {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.folder-choice p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Téléphone en portrait : la grille défile, deux photos par ligne ; « Valider » reste visible en bas. */
+@media (max-width: 600px) {
+  .sorter-bar {
+    padding: 8px 12px;
+  }
+
+  .view-switch {
+    order: 3;
+  }
+
+  .sorter-body.grid .sorter-actions {
+    position: sticky;
+    bottom: -10px;
+    padding-bottom: 10px;
+    background: var(--bg);
+  }
+
+  .sorter-body {
+    padding: 6px 12px 10px;
+  }
+
+  .sorter-body.grid {
+    overflow-y: auto;
+  }
+
+  .sorter-body.grid .grid-photos {
+    flex: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .sorter-body.grid .pick {
+    flex: none;
+    aspect-ratio: 1;
+  }
+
+  .keys,
+  .pick .key {
+    display: none;
+  }
+
+  .sorter-actions .nav {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sorter-actions .nav .primary {
+    margin-left: auto;
+  }
+
+  .plan-photos li {
+    width: 64px;
+    height: 64px;
+  }
+
+  .plan-photos .state {
+    font-size: 0.6rem;
+  }
+}
+
+/* Téléphone en paysage (peu de hauteur) : barres compactes, le plus de place possible pour les photos. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .sorter-bar {
+    padding: 4px 12px;
+  }
+
+  .sorter-bar .toggle,
+  .sorter-bar .secondary {
+    padding: 4px 10px;
+  }
+
+  .sorter-body {
+    padding: 4px 12px 6px;
+  }
+
+  .hint,
+  .keys,
+  .pick .key {
+    display: none;
+  }
+
+  .sorter-body.grid {
+    overflow-y: auto;
+  }
+
+  .sorter-body.grid .grid-photos {
+    flex: none;
+    grid-template-columns: repeat(min(var(--cols), 4), minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .sorter-body.grid .pick {
+    flex: none;
+    height: 55vh;
+  }
+
+  .sorter-actions {
+    padding-top: 4px;
+  }
+
+  .sorter-body.grid .sorter-actions {
+    position: sticky;
+    bottom: -6px;
+    padding-bottom: 6px;
+    background: var(--bg);
+  }
+
+  .sorter-actions button {
+    padding: 4px 10px;
+  }
+}

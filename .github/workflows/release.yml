@@ -1,0 +1,56 @@
+# Appli PC : exe portable construit par GitHub Actions et publié dans une « release » du dépôt. À chaque push sur
+# main, si la version de package.json n'a pas encore de release vX.Y.Z : tests, construction sous Windows, release
+# créée avec l'exe (lien « Télécharger l'appli PC » du site : releases/latest). À la main : Actions → Appli PC → Run
+# workflow (reconstruit et remplace l'exe de la version en cours). Le build local (`npm run dist`) reste disponible.
+name: Appli PC
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      exists: ${{ steps.v.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.exists == 'false' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx electron-builder --win portable --publish never
+      - name: Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          exe="release/Twin Pics $VERSION.exe"
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            gh release upload "v$VERSION" "$exe" --clobber
+          else
+            gh release create "v$VERSION" "$exe" --title "Twin Pics $VERSION" --notes "Appli PC (Windows), exe portable : rien à installer. Windows peut afficher « Windows a protégé votre ordinateur » (appli non signée) : Informations complémentaires → Exécuter quand même. Construit par GitHub Actions (commit ${GITHUB_SHA::7}). Nouveautés : docs/ROADMAP.md."
+          fi

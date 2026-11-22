@@ -1,46 +1,46 @@
 /**
- * Lire un dossier de photos, de deux façons :
- * - **File System Access API** (Chrome, Edge sur PC) : on choisit un dossier, l'appli garde son accès et pourra plus
- *   tard y déplacer des photos (dossier « À supprimer ») ; le dossier peut être repris au lancement suivant ;
- * - **champ d'envoi de dossier** (`webkitdirectory`) : partout ailleurs, en lecture seule.
+ * Les photos d'un dossier, quelle que soit la façon de le lire :
+ * - **site web** : File System Access API (Chrome, Edge sur PC ; le dossier peut être repris au lancement suivant),
+ *   sinon champ d'envoi de dossier (`webkitdirectory`), en lecture seule (`platform/web.ts`) ;
+ * - **appli PC** : le processus principal d'Electron liste le dossier, la page lit chaque photo par l'adresse
+ *   `app://twin-pics/_photo/…` (`platform/desktop.ts`).
  */
+import { fileType, isSkippedDir } from './filetypes';
 
-/** Une photo trouvée dans le dossier. `path` commence par le nom du dossier choisi. */
+export { folderOf, nameOf } from './filetypes';
+
+/** Une photo trouvée dans le dossier. */
 export interface FoundFile {
+  /** Chemin affiché, avec des « / » : commence par le nom du dossier choisi (site) ou est complet (appli PC). */
   path: string;
-  file: File;
+  size: number;
+  lastModified: number;
+  /** Le contenu du fichier (lu une seule fois par l'analyse). */
+  read(): Promise<ArrayBuffer>;
+  /** Une adresse pour l'afficher en grand ; `release` la libère. */
+  open(): { url: string; release(): void };
 }
-
-/** Extensions lues par le navigateur. */
-export const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif'];
-/** Photos que Chrome ne sait pas ouvrir (iPhone) : comptées à part, pas analysées. */
-export const UNSUPPORTED_EXT = ['heic', 'heif'];
-export const VIDEO_EXT = ['mp4', 'mov', 'm4v', '3gp', 'avi', 'mkv', 'webm'];
-
-export function extensionOf(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot < 0 ? '' : name.slice(dot + 1).toLowerCase();
-}
-
-export type FileType = 'image' | 'unsupported' | 'video' | 'other';
-
-export function fileType(name: string): FileType {
-  const ext = extensionOf(name);
-  if (IMAGE_EXT.includes(ext)) return 'image';
-  if (UNSUPPORTED_EXT.includes(ext)) return 'unsupported';
-  if (VIDEO_EXT.includes(ext)) return 'video';
-  return 'other';
-}
-
-/** Dossiers ignorés : corbeilles, miniatures et fichiers système. */
-const SKIPPED_DIRS = /^(\$RECYCLE\.BIN|System Volume Information|\.thumbnails|\.trashed.*|\.git|node_modules)$/i;
-
-export const canPickDirectory = (): boolean => typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 
 export interface Listing {
   images: FoundFile[];
   unsupported: number;
   videos: number;
+}
+
+export const canPickDirectory = (): boolean => typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
+/** Une photo d'un navigateur (objet `File`). */
+export function fromFile(path: string, file: File): FoundFile {
+  return {
+    path,
+    size: file.size,
+    lastModified: file.lastModified,
+    read: () => file.arrayBuffer(),
+    open: () => {
+      const url = URL.createObjectURL(file);
+      return { url, release: () => URL.revokeObjectURL(url) };
+    },
+  };
 }
 
 /** Parcourt un dossier choisi avec la File System Access API (sous-dossiers compris). */
@@ -54,12 +54,12 @@ export async function listDirectory(
     for await (const entry of dir.values()) {
       if (signal.aborted) return;
       if (entry.kind === 'directory') {
-        if (!SKIPPED_DIRS.test(entry.name)) await walk(entry as FileSystemDirectoryHandle, `${path}/${entry.name}`);
+        if (!isSkippedDir(entry.name)) await walk(entry as FileSystemDirectoryHandle, `${path}/${entry.name}`);
         continue;
       }
       const type = fileType(entry.name);
       if (type === 'image') {
-        listing.images.push({ path: `${path}/${entry.name}`, file: await (entry as FileSystemFileHandle).getFile() });
+        listing.images.push(fromFile(`${path}/${entry.name}`, await (entry as FileSystemFileHandle).getFile()));
         if (listing.images.length % 100 === 0) onProgress(listing.images.length);
       } else if (type === 'unsupported') listing.unsupported++;
       else if (type === 'video') listing.videos++;
@@ -75,21 +75,11 @@ export function listFileList(files: FileList | File[]): Listing {
   const listing: Listing = { images: [], unsupported: 0, videos: 0 };
   for (const file of Array.from(files)) {
     const path = file.webkitRelativePath || file.name;
-    if (path.split('/').some((part) => SKIPPED_DIRS.test(part))) continue;
+    if (path.split('/').slice(0, -1).some(isSkippedDir)) continue;
     const type = fileType(file.name);
-    if (type === 'image') listing.images.push({ path, file });
+    if (type === 'image') listing.images.push(fromFile(path, file));
     else if (type === 'unsupported') listing.unsupported++;
     else if (type === 'video') listing.videos++;
   }
   return listing;
-}
-
-/** Dossier d'une photo (sans le nom du fichier). */
-export function folderOf(path: string): string {
-  const slash = path.lastIndexOf('/');
-  return slash < 0 ? '' : path.slice(0, slash);
-}
-
-export function nameOf(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
 }

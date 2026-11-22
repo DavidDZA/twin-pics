@@ -16,8 +16,8 @@
 import { db, photoKey, type PhotoRow } from './db';
 import { LIMITS, type Pair, type PhotoInfo } from './groups';
 import type { AnalyzeRequest, AnalyzeResult, EmbedMessage, EmbedRequest, ModelDevice, Pixels } from './messages';
-import type { Listing } from './files';
-import { nameOf } from './files';
+import type { FoundFile, Listing } from './files';
+import { nameOf } from './filetypes';
 import { DEVICE_KEY, embedId } from './model';
 import { Limiter, WorkerPool } from './pool';
 
@@ -37,8 +37,8 @@ export interface ScanOptions {
 
 export interface ScanResult {
   photos: PhotoInfo[];
-  /** Fichier de chaque photo (clé), pour l'afficher en grand. */
-  files: Map<string, File>;
+  /** Fichier de chaque photo (clé), pour l'afficher en grand et la supprimer. */
+  files: Map<string, FoundFile>;
   pairs: Pair[];
   /** Photos que le navigateur n'a pas su lire. */
   unreadable: number;
@@ -149,14 +149,14 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   if (signal.aborted) throw abortError();
 
   // Une entrée par fichier (une photo vue deux fois par le navigateur n'est comptée qu'une fois).
-  const entries = new Map<string, { path: string; file: File }>();
-  for (const f of listing.images) entries.set(photoKey(f.path, f.file.size, f.file.lastModified), f);
+  const entries = new Map<string, FoundFile>();
+  for (const f of listing.images) entries.set(photoKey(f.path, f.size, f.lastModified), f);
   const keys = [...entries.keys()];
   const cached = await db.photos.bulkGet(keys);
   const rows = new Map<string, PhotoRow>();
   keys.forEach((k, i) => {
     const e = entries.get(k)!;
-    rows.set(k, cached[i] ?? { key: k, path: e.path, size: e.file.size, lastModified: e.file.lastModified });
+    rows.set(k, cached[i] ?? { key: k, path: e.path, size: e.size, lastModified: e.lastModified });
   });
 
   // SHA-256 seulement pour les tailles partagées : deux copies exactes ont la même taille.
@@ -235,7 +235,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   };
 
   /** Lit le fichier d'une photo (2 à la fois) et le confie à un worker d'analyse. */
-  const read = (row: PhotoRow) => reads.run(() => entries.get(row.key)!.file.arrayBuffer());
+  const read = (row: PhotoRow) => reads.run(() => entries.get(row.key)!.read());
 
   let analyzed = 0;
   try {
@@ -303,11 +303,9 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   onProgress({ phase: 'pairs', done: 0, total: photos.length });
   const pairs = await computePairs(photos, signal);
 
-  const files = new Map<string, File>();
-  for (const [k, e] of entries) files.set(k, e.file);
   return {
     photos,
-    files,
+    files: entries,
     pairs,
     unreadable: [...rows.values()].filter((r) => r.error).length,
     unsupported: listing.unsupported,
