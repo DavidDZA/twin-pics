@@ -52,6 +52,7 @@ test.afterEach(async () => {
 async function analyze() {
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if (await box.isChecked()) await box.click();
+  await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
   await expect(page.getByText('photos analysées')).toBeVisible({ timeout: 30_000 });
 }
@@ -74,7 +75,7 @@ test('appli PC : analyse, tri en grille, Corbeille', async () => {
   // Pas de message « version d'essai » dans l'appli PC.
   await expect(page.getByText('Version d’essai en ligne')).toHaveCount(0);
   await analyze();
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('8');
+  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('15');
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
 
   // Grille : photos en grand (fichier d'origine lu par l'appli), la suggestion gardée, les autres à supprimer.
@@ -110,7 +111,7 @@ test('appli PC : analyse, tri en grille, Corbeille', async () => {
   expect(existsSync(join(photos, 'Animaux', 'chat.jpg'))).toBe(true);
   expect(existsSync(join(photos, 'Vacances', 'plage.jpg'))).toBe(true);
   await expect(page.getByTestId('group')).toHaveCount(0);
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('5');
+  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('12');
 });
 
 test('appli PC : dossier « À supprimer », annulation', async () => {
@@ -134,7 +135,7 @@ test('appli PC : dossier « À supprimer », annulation', async () => {
   // Une nouvelle analyse n'y regarde pas : plus aucun groupe.
   await page.getByRole('button', { name: 'Relancer' }).click();
   await expect(page.getByText('photos analysées')).toBeVisible();
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('5');
+  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('12');
 });
 
 test('appli PC : annuler remet les photos à leur place', async () => {
@@ -161,6 +162,30 @@ test('appli PC : disque sans Corbeille, rien n’est touché', async () => {
   await expect(page.getByTestId('remove-report')).toContainText('3 photos n’ont pas pu aller dans la Corbeille');
   expect(existsSync(join(photos, 'Animaux', 'chat - Copie.jpg'))).toBe(true);
   await expect(page.getByTestId('group')).toHaveCount(2);
+});
+
+test('appli PC : photos inutiles triées en swipe, puis à la Corbeille', async () => {
+  await launch();
+  await analyze();
+  await page.getByRole('tab', { name: /Inutiles/ }).click();
+  await page.getByRole('button', { name: 'Trier les photos inutiles' }).click();
+  const sorter = page.getByRole('dialog', { name: 'Trier les photos inutiles' });
+  await sorter.getByRole('button', { name: 'Swipe' }).click();
+  // Les deux photos noires d'un coup, puis la floue gardée, la sombre jetée.
+  await expect(sorter.getByText('2 photos semblables')).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await expect(sorter.getByText('floue.jpg')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(sorter.getByText('sombre.jpg')).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await sorter.getByRole('button', { name: 'Retour aux groupes' }).click();
+  await page.getByRole('button', { name: /Supprimer 3 photos/ }).click();
+  await page.getByRole('dialog', { name: 'Avant de supprimer' }).getByRole('button', { name: 'Supprimer 3 photos' }).click();
+  await expect(page.getByTestId('remove-report')).toContainText('3 photos supprimées');
+  expect(readdirSync(trash).sort()).toEqual(['noire-1.jpg', 'noire-2.jpg', 'sombre.jpg']);
+  expect(existsSync(join(photos, 'Ratées', 'floue.jpg'))).toBe(true);
+  // Restent : la floue (gardée), la rafale floue et les deux captures d'écran.
+  await expect(page.getByTestId('group')).toHaveCount(4);
 });
 
 test('appli PC : photos similaires sur la carte graphique (E2E_MODELE=1 : télécharge le modèle)', async () => {

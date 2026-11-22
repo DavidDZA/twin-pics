@@ -12,6 +12,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { Kind, Params } from './groups';
 import type { Mark } from './choices';
+import type { Quality } from './quality';
 
 export interface PhotoRow {
   key: string;
@@ -30,6 +31,12 @@ export interface PhotoRow {
   emb?: Float32Array;
   /** Modèle qui a calculé `emb` (`EMBED_ID`). */
   embModel?: string;
+  /** Mesures de qualité (photos inutiles) et leur version (`QUALITY_VERSION`). */
+  quality?: Quality;
+  qv?: number;
+  /** Vecteur MobileCLIP (photos inutiles) et le modèle qui l'a calculé (`clipId`). */
+  clip?: Float32Array;
+  clipModel?: string;
 }
 
 export interface ThumbRow {

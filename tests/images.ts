@@ -53,3 +53,11 @@ export async function analyzeBuffer(buf: Buffer) {
     height: meta.height!,
   };
 }
+
+/** Mesures de qualité d'une image (version de 1024 px), comme le worker d'analyse. */
+export async function qualityOf(buf: Buffer) {
+  const { measureQuality } = await import('../src/lib/quality');
+  const meta = await sharp(buf).metadata();
+  const big = analysisSize(meta.width!, meta.height!, SHARPNESS_SIZE);
+  return measureQuality(await grayAt(buf, big), big.width, big.height);
+}

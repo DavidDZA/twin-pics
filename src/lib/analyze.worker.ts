@@ -8,6 +8,7 @@
 import exifr from 'exifr';
 import { analysisSize, dHash, grayFromRGBA, SHARPNESS_SIZE, sharpness } from './imagehash';
 import type { AnalyzeRequest, AnalyzeResult, Pixels } from './messages';
+import { measureQuality } from './quality';
 
 /** Grand côté de la miniature affichée dans les groupes. */
 const THUMB_MAX = 200;
@@ -80,8 +81,8 @@ async function analyze(req: AnalyzeRequest): Promise<{ result: AnalyzeResult; tr
   thumbCanvas.getContext('2d')!.drawImage(full, 0, 0, t.width, t.height);
   const thumb = await thumbCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.75 });
 
-  // Entrée du modèle : seulement pour les photos datées (les photos similaires se cherchent dans le temps).
-  const pixels = wantPixels && exif.time !== undefined ? modelPixels(full) : undefined;
+  // Entrée des modèles : les photos similaires se cherchent dans le temps (photos datées) ; MobileCLIP voit tout.
+  const pixels = wantPixels === 'all' || (wantPixels === 'dated' && exif.time !== undefined) ? modelPixels(full) : undefined;
   full.close();
 
   return {
@@ -91,6 +92,7 @@ async function analyze(req: AnalyzeRequest): Promise<{ result: AnalyzeResult; tr
       sha,
       dhash: dHash(gray, small.width, small.height),
       sharpness: sharpness(bigGray, big.width, big.height),
+      quality: measureQuality(bigGray, big.width, big.height),
       width,
       height,
       thumb,

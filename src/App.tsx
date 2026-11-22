@@ -22,29 +22,34 @@ type Screen = { name: 'start'; error?: string } | { name: 'scan'; progress: Prog
 export type Source = { kind: 'handle'; handle: FileSystemDirectoryHandle } | { kind: 'files'; files: File[] } | { kind: 'desktop'; root: string };
 
 const SIMILAR_KEY = 'opt-similar';
+const JUNK_KEY = 'opt-junk-model';
 
-function readSimilar(): boolean {
+/** Une option de la page de départ (cochée par défaut), retenue. */
+function readOption(key: string): boolean {
   try {
-    return localStorage.getItem(SIMILAR_KEY) !== 'false';
+    return localStorage.getItem(key) !== 'false';
   } catch {
     return true;
   }
 }
 
+function saveOption(key: string, v: boolean): void {
+  try {
+    localStorage.setItem(key, String(v));
+  } catch {
+    // Préférence non retenue.
+  }
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'start' });
-  const [similar, setSimilarState] = useState(readSimilar);
+  const [similar, setSimilarState] = useState(() => readOption(SIMILAR_KEY));
+  const [junkModel, setJunkModelState] = useState(() => readOption(JUNK_KEY));
   const source = useRef<Source | null>(null);
   const abort = useRef<AbortController | null>(null);
 
-  const setSimilar = (v: boolean) => {
-    setSimilarState(v);
-    try {
-      localStorage.setItem(SIMILAR_KEY, String(v));
-    } catch {
-      // Préférence non retenue.
-    }
-  };
+  const setSimilar = (v: boolean) => (setSimilarState(v), saveOption(SIMILAR_KEY, v));
+  const setJunkModel = (v: boolean) => (setJunkModelState(v), saveOption(JUNK_KEY, v));
 
   const run = useCallback(
     async (src: Source) => {
@@ -62,14 +67,14 @@ export default function App() {
           listing = await listDesktop(desktop!, src.root, folder ? [folder] : [], listed);
         } else listing = listFileList(src.files);
         if (controller.signal.aborted) throw new DOMException('', 'AbortError');
-        const result = await scan(listing, { similar, signal: controller.signal, onProgress: (progress) => setScreen({ name: 'scan', progress }) });
+        const result = await scan(listing, { similar, junkModel, signal: controller.signal, onProgress: (progress) => setScreen({ name: 'scan', progress }) });
         setScreen({ name: 'results', result });
       } catch (err) {
         if ((err as Error).name === 'AbortError') setScreen({ name: 'start' });
         else setScreen({ name: 'start', error: T.scan.failed(String((err as Error).message ?? err)) });
       }
     },
-    [similar],
+    [similar, junkModel],
   );
 
   const pickFolder = async () => {
@@ -113,6 +118,8 @@ export default function App() {
             canPick={!!desktop || canPickDirectory()}
             similar={similar}
             onSimilar={setSimilar}
+            junkModel={junkModel}
+            onJunkModel={setJunkModel}
             onPick={pickFolder}
             onFiles={(files) => run({ kind: 'files', files })}
             onResume={resume}

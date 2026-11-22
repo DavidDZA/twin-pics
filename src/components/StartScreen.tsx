@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { T } from '../i18n';
 import { getMeta } from '../lib/db';
 import { EMBED_SIZE_MB } from '../lib/model';
+import { CLIP_CPU_MB } from '../lib/junk';
 import { nameOf } from '../lib/filetypes';
 import { RELEASES_URL, desktop } from '../platform';
 import { TwinCards } from './TwinCards';
@@ -10,6 +11,8 @@ interface Props {
   canPick: boolean;
   similar: boolean;
   onSimilar: (v: boolean) => void;
+  junkModel: boolean;
+  onJunkModel: (v: boolean) => void;
   onPick: () => void;
   onFiles: (files: File[]) => void;
   /** Le dernier dossier : son accès (site, File System Access API) ou son chemin (appli PC). */
@@ -17,7 +20,7 @@ interface Props {
   error?: string;
 }
 
-export function StartScreen({ canPick, similar, onSimilar, onPick, onFiles, onResume, error }: Props) {
+export function StartScreen({ canPick, similar, onSimilar, junkModel, onJunkModel, onPick, onFiles, onResume, error }: Props) {
   const [last, setLast] = useState<FileSystemDirectoryHandle | string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -70,6 +73,13 @@ export function StartScreen({ canPick, similar, onSimilar, onPick, onFiles, onRe
         <span>
           <strong>{T.start.similar}</strong>
           <span className="muted small">{T.start.similarHelp(EMBED_SIZE_MB)}</span>
+        </span>
+      </label>
+      <label className="option">
+        <input type="checkbox" checked={junkModel} onChange={(e) => onJunkModel(e.target.checked)} />
+        <span>
+          <strong>{T.start.junkModel}</strong>
+          <span className="muted small">{T.start.junkModelHelp(CLIP_CPU_MB)}</span>
         </span>
       </label>
 

@@ -6,6 +6,7 @@ async function analyze(page: Page, similar = false) {
   await page.goto('/');
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if ((await box.isChecked()) !== similar) await box.click();
+  await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
   await expect(page.getByText('photos analysées')).toBeVisible({ timeout: similar ? 120_000 : 30_000 });
 }
@@ -22,8 +23,8 @@ test('départ : promesse, confidentialité, option des photos similaires', async
 
 test('trouve les copies exactes et les quasi identiques', async ({ page }) => {
   await analyze(page);
-  // 8 photos lisibles (la photo cassée, le HEIC et la vidéo sont à part).
-  await expect(tile(page, 'photos analysées')).toHaveText('8');
+  // 15 photos lisibles, dont 7 ratées (la photo cassée, le HEIC et la vidéo sont à part).
+  await expect(tile(page, 'photos analysées')).toHaveText('15');
   await expect(page.getByText(/1 photo illisible, 1 photo HEIC \(iPhone\).*1 vidéo/)).toBeVisible();
 
   const groups = page.getByTestId('group');
@@ -128,6 +129,7 @@ test('langue : en anglais, toute l’interface suit', async ({ page }) => {
   await page.getByRole('combobox', { name: 'Langue' }).selectOption('en');
   await expect(page.getByRole('button', { name: 'Choose a photo folder' })).toBeVisible();
   await page.getByRole('checkbox', { name: /similar photos/ }).uncheck();
+  await page.getByRole('checkbox', { name: /documents, receipts and memes/ }).uncheck();
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
   await expect(page.getByText('photos analyzed')).toBeVisible();
   await expect(page.getByRole('tab', { name: /Exact copies/ })).toBeVisible();
@@ -170,6 +172,7 @@ test.describe('modèle des photos similaires (téléchargé : E2E_MODELE=1)', ()
     await expect(page.getByText(/calculées par/)).toHaveCount(0);
     await page.getByRole('button', { name: 'Autre dossier' }).click();
     await page.getByRole('checkbox', { name: /photos similaires/ }).check();
+    await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
     await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
     await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 120_000 });
     await expectBurst(page);

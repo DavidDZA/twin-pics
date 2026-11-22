@@ -169,6 +169,10 @@ button.link {
   margin-top: 24px;
 }
 
+.option + .option {
+  margin-top: 10px;
+}
+
 /* Analyse */
 .scan {
   max-width: 560px;

@@ -1,4 +1,8 @@
-/** Messages échangés avec les workers d'analyse (`analyze.worker.ts`) et du modèle (`embed.worker.ts`). */
+/**
+ * Messages échangés avec les workers d'analyse (`analyze.worker.ts`) et des modèles (`embed.worker.ts` : photos
+ * similaires ; `clip.worker.ts` : photos inutiles, mêmes messages).
+ */
+import type { Quality } from './quality';
 
 /** Pixels RGBA d'une petite version de la photo (petit côté de 256 px) : l'entrée du modèle. */
 export interface Pixels {
@@ -16,8 +20,11 @@ export interface AnalyzeRequest {
    */
   mode: 'full' | 'pixels';
   needSha: boolean;
-  /** Préparer l'entrée du modèle si la photo est datée (photos similaires demandées). */
-  wantPixels: boolean;
+  /**
+   * Préparer l'entrée des modèles : `dated` si la photo est datée (photos similaires seulement), `all` pour toute photo
+   * (MobileCLIP, photos inutiles), `none`.
+   */
+  wantPixels: 'none' | 'dated' | 'all';
 }
 
 export interface AnalyzeResult {
@@ -32,6 +39,8 @@ export interface AnalyzeResult {
   height?: number;
   time?: number;
   camera?: string;
+  /** Mesures de qualité (photos inutiles). */
+  quality?: Quality;
   thumb?: Blob;
   pixels?: Pixels;
 }

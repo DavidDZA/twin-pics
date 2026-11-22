@@ -1,5 +1,7 @@
 /**
  * Les résultats : chiffres, tri (`Sorter`), suppression (`RemoveDialog`), réglages de la détection, groupes.
+ * Onglets : tous les doublons, chaque niveau, et les photos **inutiles** (`junk.ts`, leurs propres réglages ; une photo
+ * déjà dans un groupe de doublons n'y est pas).
  *
  * Les photos supprimées pendant la session disparaissent des groupes (`gone`) ; le tri (« garder » / « supprimer »)
  * est retenu en base photo par photo (`marks`), jusqu'à la suppression.
@@ -12,15 +14,20 @@ import { isSorted, pendingRemoval, type Choice, type Mark } from '../lib/choices
 import type { ScanResult } from '../lib/scan';
 import { desktop, readRemoveSettings, removeFolder, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
 import { setDisplayRoot } from '../lib/display';
+import { buildJunkGroups, clipScores, junkReasons, JUNK_DEFAULTS, JUNK_REASONS, type JunkParams, type JunkPrompts } from '../lib/junk';
+import junkPrompts from '../lib/junkPrompts.json';
 import { GroupCard } from './GroupCard';
+import { JunkSettings } from './JunkSettings';
 import { RemoveDialog } from './RemoveDialog';
 import { SettingsPanel } from './SettingsPanel';
 import { Sorter } from './Sorter';
 import { Viewer } from './Viewer';
 
 const PARAMS_KEY = 'detect-params';
+const JUNK_KEY = 'junk-params';
+const PROMPTS = junkPrompts as JunkPrompts;
 const PAGE = 30;
-const KINDS: Kind[] = ['exact', 'near', 'similar'];
+const KINDS: Kind[] = ['exact', 'near', 'similar', 'junk'];
 /** Photos envoyées à l'appli PC à la fois (pour suivre la progression). */
 const REMOVE_BATCH = 20;
 
@@ -36,6 +43,21 @@ function readParams(): Params {
     // Réglages abîmés : ceux par défaut.
   }
   return { ...DEFAULTS };
+}
+
+function readJunkParams(): JunkParams {
+  try {
+    const raw = JSON.parse(localStorage.getItem(JUNK_KEY) ?? 'null');
+    if (raw && typeof raw === 'object') {
+      const p: JunkParams = { ...JUNK_DEFAULTS, off: [] };
+      for (const k of ['blurMax', 'clipMin', 'groupMin'] as const) if (typeof raw[k] === 'number') p[k] = raw[k];
+      if (Array.isArray(raw.off)) p.off = raw.off.filter((r: unknown) => JUNK_REASONS.includes(r as never));
+      return p;
+    }
+  } catch {
+    // Réglages abîmés : ceux par défaut.
+  }
+  return { ...JUNK_DEFAULTS, off: [] };
 }
 
 /** Ce qu'a donné la dernière suppression. */
@@ -63,6 +85,7 @@ interface Props {
 
 export function Results({ result, onRescan, canRescan, onAnother, root }: Props) {
   const [params, setParamsState] = useState<Params>(readParams);
+  const [junkParams, setJunkParamsState] = useState<JunkParams>(readJunkParams);
   const [tab, setTab] = useState<Kind | 'all'>('all');
   const [shown, setShown] = useState(PAGE);
   const [labels, setLabels] = useState<Map<string, LabelRow>>(new Map());
@@ -85,6 +108,14 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
       // Réglages non retenus.
     }
   };
+  const setJunkParams = (p: JunkParams) => {
+    setJunkParamsState(p);
+    try {
+      localStorage.setItem(JUNK_KEY, JSON.stringify(p));
+    } catch {
+      // Réglages non retenus.
+    }
+  };
   const setRemoveSettings = (s: RemoveSettings) => {
     setRemoveSettingsState(s);
     saveRemoveSettings(s);
@@ -97,16 +128,30 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
 
   const pairs = useMemo(() => (gone.size ? result.pairs.filter((p) => !gone.has(photos[p.a].key) && !gone.has(photos[p.b].key)) : result.pairs), [result, photos, gone]);
   const groups = useMemo(() => buildGroups(photos, pairs, params), [photos, pairs, params]);
+  // Photos inutiles : probabilités du modèle (une fois), raisons et groupes (à chaque réglage).
+  const scores = useMemo(() => photos.map((p) => (p.clip ? clipScores(p.clip, PROMPTS) : undefined)), [photos]);
+  const reasons = useMemo(() => photos.map((p, i) => junkReasons({ ...p, scores: scores[i] }, junkParams)), [photos, scores, junkParams]);
+  const junkGroups = useMemo(() => {
+    const exclude = new Set<number>();
+    for (const g of groups) for (const i of g.members) exclude.add(i);
+    photos.forEach((p, i) => gone.has(p.key) && exclude.add(i));
+    return buildJunkGroups(photos, reasons, junkParams, exclude);
+  }, [photos, groups, reasons, junkParams, gone]);
+  const hasModel = useMemo(() => photos.some((p) => p.clip), [photos]);
+
   const counts = useMemo(() => {
-    const c: Record<Kind, number> = { exact: 0, near: 0, similar: 0 };
+    const c: Record<Kind, number> = { exact: 0, near: 0, similar: 0, junk: junkGroups.length };
     for (const g of groups) c[g.kind]++;
     return c;
-  }, [groups]);
-  const visible = tab === 'all' ? groups : groups.filter((g) => g.kind === tab);
-  const extra = visible.reduce((s, g) => s + g.members.length - 1, 0);
+  }, [groups, junkGroups]);
+  const isJunk = tab === 'junk';
+  const visible = tab === 'all' ? groups : isJunk ? junkGroups : groups.filter((g) => g.kind === tab);
+  // Doublons : photos en trop (toutes sauf une par groupe) ; inutiles : toutes.
+  const extra = visible.reduce((s, g) => s + g.members.length - (isJunk ? 0 : 1), 0);
   const wasted = visible.reduce((s, g) => s + g.wasted, 0);
-  const pending = useMemo(() => pendingRemoval(groups, photos, marks), [groups, photos, marks]);
-  const sortedCount = pending.sorted;
+  const allGroups = useMemo(() => [...groups, ...junkGroups], [groups, junkGroups]);
+  const pending = useMemo(() => pendingRemoval(allGroups, photos, marks), [allGroups, photos, marks]);
+  const sortedCount = visible.filter((g) => isSorted(g, photos, marks)).length;
 
   const verdicts = [...labels.values()];
   const good = verdicts.filter((l) => l.verdict === 'good').length;
@@ -206,7 +251,7 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
         </div>
         <div className="tile">
           <strong>{num(extra)}</strong>
-          <span>{T.results.extra}</span>
+          <span>{isJunk ? T.results.junkExtra : T.results.extra}</span>
         </div>
         <div className="tile">
           <strong>{bytes(wasted)}</strong>
@@ -216,17 +261,19 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
 
       {report && <RemoveReport report={report} onUndo={undo} onClose={() => setReport(null)} />}
 
-      {groups.length > 0 && (
+      {(visible.length > 0 || pending.remove.length > 0) && (
         <div className="sort-bar">
           <span className="sort-status">
-            <span data-testid="sort-progress">{T.sort.progress(sortedCount, groups.length)}</span>
+            <span data-testid="sort-progress">{T.sort.progress(sortedCount, visible.length)}</span>
             <span className="meter" aria-hidden="true">
-              <span style={{ width: `${(100 * sortedCount) / groups.length}%` }} />
+              <span style={{ width: `${visible.length ? (100 * sortedCount) / visible.length : 100}%` }} />
             </span>
           </span>
-          <button className="primary" onClick={() => startSorting(visible)}>
-            {sortedCount ? T.sort.resume : T.sort.start}
-          </button>
+          {visible.length > 0 && (
+            <button className="primary" onClick={() => startSorting(visible)}>
+              {sortedCount ? T.sort.resume : isJunk ? T.sort.startJunk : T.sort.start}
+            </button>
+          )}
           {pending.remove.length > 0 && (
             <button className="primary danger" onClick={() => setRemoving(true)}>
               {T.sort.removeN(pending.remove.length, bytes(pending.bytes))}
@@ -239,10 +286,16 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
         {T.results.elapsed(duration(result.seconds), result.analyzed)}
         {skipped > 0 && <> {T.results.skipped(result.unreadable, result.unsupported, result.videos)}</>}
         {result.device && <> {T.results.device(result.device === 'webgpu')}</>}
+        {result.clipDevice && <> {T.results.clipDevice(result.clipDevice === 'webgpu')}</>}
       </p>
       {result.modelError && (
         <p className="error" role="alert">
           {T.results.modelError}
+        </p>
+      )}
+      {result.clipError && (
+        <p className="error" role="alert">
+          {T.results.clipError}
         </p>
       )}
 
@@ -257,7 +310,11 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
         </button>
       </div>
 
-      <SettingsPanel params={params} onChange={setParams} onReset={() => setParams({ ...DEFAULTS })} />
+      {isJunk ? (
+        <JunkSettings params={junkParams} onChange={setJunkParams} hasModel={hasModel} />
+      ) : (
+        <SettingsPanel params={params} onChange={setParams} onReset={() => setParams({ ...DEFAULTS })} />
+      )}
       {verdicts.length > 0 && <p className="muted small">{T.results.verified(good, wrong)}</p>}
 
       <div className="tabs" role="tablist">

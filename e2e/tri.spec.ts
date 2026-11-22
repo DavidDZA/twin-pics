@@ -14,6 +14,7 @@ async function analyze(page: Page) {
   await page.goto('/');
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if (await box.isChecked()) await box.click();
+  await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
   await expect(page.getByText('photos analysées')).toBeVisible({ timeout: 30_000 });
 }

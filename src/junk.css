@@ -1,0 +1,221 @@
+/* Photos inutiles : onglet, réglages, mode swipe (SwipeCard). */
+
+.group.kind-junk {
+  border-left-color: #8a63d2;
+}
+
+.chip.junk {
+  color: #8a63d2;
+  background: rgba(138, 99, 210, 0.13);
+}
+
+.chip.junk-reason {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 8px 0;
+}
+
+.reason {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.reason.off {
+  color: var(--muted);
+}
+
+/* Swipe : une carte à la fois, glissée à gauche (je jette) ou à droite (je garde). */
+.swipe-body {
+  overflow: hidden;
+}
+
+.swipe {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.swipe-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.swipe-card {
+  position: relative;
+  width: min(100%, 720px);
+  height: 100%;
+  min-height: 200px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--thumb-bg);
+  box-shadow: var(--shadow-lift, 0 8px 24px rgba(0, 0, 0, 0.15));
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+.swipe-card.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.swipe-card.leaving {
+  transition: transform 0.18s ease-in;
+}
+
+.mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mosaic.m2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.mosaic.m3,
+.mosaic.m4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.mosaic.m3 .tile-img:first-child {
+  grid-row: span 2;
+}
+
+.tile-img {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tile-img img,
+.tile-img .placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mosaic:not(.m1) .tile-img img {
+  object-fit: cover;
+}
+
+.more-count {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(15, 17, 26, 0.7);
+}
+
+.stamp {
+  position: absolute;
+  top: 24px;
+  padding: 6px 16px;
+  border: 4px solid currentColor;
+  border-radius: 12px;
+  font-size: 1.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.stamp.keep {
+  left: 20px;
+  color: var(--good);
+  transform: rotate(-12deg);
+}
+
+.stamp.remove {
+  right: 20px;
+  color: var(--wrong);
+  transform: rotate(12deg);
+}
+
+.swipe-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 12px;
+  text-align: center;
+}
+
+.reasons-line {
+  font-weight: 600;
+  color: #8a63d2;
+}
+
+.swipe-buttons {
+  display: flex;
+  gap: 14px;
+}
+
+.swipe-btn {
+  min-width: 150px;
+  padding: 12px 20px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border: none;
+  color: #fff;
+}
+
+.swipe-btn.remove {
+  background: linear-gradient(135deg, #e8455d, #ff8a4c);
+}
+
+.swipe-btn.keep {
+  background: linear-gradient(135deg, #2f8f5b, #4f7cff);
+}
+
+.swipe-body .sorter-actions {
+  justify-content: space-between;
+}
+
+@media (max-width: 600px) {
+  .swipe-btn {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .swipe-buttons {
+    width: 100%;
+  }
+
+  .stamp {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .swipe-body .hint {
+    display: none;
+  }
+
+  .swipe-btn {
+    padding: 6px 16px;
+  }
+}

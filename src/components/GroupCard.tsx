@@ -5,7 +5,7 @@ import { folderOf } from '../lib/filetypes';
 import { shortPath } from '../lib/display';
 import type { Verdict } from '../lib/db';
 import type { Mark } from '../lib/choices';
-import { likenessText } from './photoText';
+import { likenessText, reasonsText } from './photoText';
 import { useThumbs } from './useThumbs';
 
 interface Props {
@@ -28,6 +28,7 @@ export const GroupCard = memo(function GroupCard({ group, photos, verdict, marks
     <article className={`group kind-${group.kind}${sorted ? ' sorted' : ''}`} data-testid="group" data-kind={group.kind}>
       <header>
         <span className={`chip ${group.kind}`}>{T.results.kinds[group.kind]}</span>
+        {group.junk && <span className="chip junk-reason">{reasonsText([group.junk.main])}</span>}
         <span>{T.group.photos(group.members.length)}</span>
         <span className="muted">{first.time ? dateTime(first.time) : T.group.noDate}</span>
         <span className="muted">{T.group.wasted(bytes(group.wasted))}</span>
@@ -76,7 +77,7 @@ export const GroupCard = memo(function GroupCard({ group, photos, verdict, marks
           {T.group.good}
         </button>
         <button className={verdict === 'wrong' ? 'toggle on wrong' : 'toggle'} aria-pressed={verdict === 'wrong'} onClick={() => onVerdict(verdict === 'wrong' ? null : 'wrong')}>
-          {T.group.wrong}
+          {group.junk ? T.group.wrongJunk : T.group.wrong}
         </button>
       </footer>
     </article>

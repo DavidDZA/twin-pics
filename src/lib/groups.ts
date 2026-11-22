@@ -15,8 +15,14 @@
  *    les groupes. Instantané, d'où les curseurs de réglage qui regroupent en direct.
  */
 import { cosine, hamming, hashWords, isUniformHash, popcount32 } from './imagehash';
+import type { JunkReason } from './junk';
+import type { Quality } from './quality';
 
-export type Kind = 'exact' | 'near' | 'similar';
+/** Nature d'un groupe : trois niveaux de doublons, et les photos inutiles (`junk.ts`). */
+export type Kind = 'exact' | 'near' | 'similar' | 'junk';
+
+/** Les trois niveaux de doublons. */
+export type DupKind = Exclude<Kind, 'junk'>;
 
 /** Ce que le regroupement sait d'une photo. */
 export interface PhotoInfo {
@@ -35,12 +41,18 @@ export interface PhotoInfo {
   sharpness?: number;
   width?: number;
   height?: number;
+  /** Appareil photo (EXIF) : une capture d'écran n'en a pas. */
+  camera?: string;
+  /** Mesures de qualité (photos inutiles). */
+  quality?: Quality;
+  /** Vecteur MobileCLIP, normalisé (photos inutiles). */
+  clip?: Float32Array;
 }
 
 export interface Pair {
   a: number;
   b: number;
-  kind: Kind;
+  kind: DupKind;
   /** Distance de Hamming des dHash (quasi identiques). */
   dist?: number;
   /** Similarité cosinus des vecteurs (similaires). */
@@ -104,10 +116,12 @@ export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] 
     }
   }
 
-  // Similaires : seulement entre photos datées et proches dans le temps.
+  // Similaires : seulement entre photos datées et proches dans le temps. Pas les images presque uniformes (photos
+  // noires prises dans la poche) : le modèle les juge pareilles, mais ce ne sont pas des doublons à départager ;
+  // elles vont dans les photos inutiles.
   const timed = photos
     .map((_, i) => i)
-    .filter((i) => photos[i].time !== undefined && photos[i].emb)
+    .filter((i) => photos[i].time !== undefined && photos[i].emb && !(photos[i].dhash && isUniformHash(photos[i].dhash!)))
     .sort((i, j) => photos[i].time! - photos[j].time!);
   const window = limits.windowMin * MINUTE;
   for (let k = 0; k < timed.length; k++) {
@@ -133,12 +147,15 @@ export interface Group {
   kind: Kind;
   /** Indices des photos, la suggestion d'abord, puis par date. */
   members: number[];
+  /** La suggestion (−1 : pas de suggestion, photos inutiles). */
   best: number;
   reason: BestReason;
   /** Place libérée si l'on ne garde que la suggestion (octets). */
   wasted: number;
   /** Date du groupe (première prise de vue, sinon modification du fichier). */
   time: number;
+  /** Photos inutiles : les raisons de chaque photo (indice → raisons) et la plus fréquente. */
+  junk?: { reasons: Record<number, JunkReason[]>; main: JunkReason };
 }
 
 /** Dossiers et noms qui trahissent une copie (messageries, téléchargements, « (1) », « - Copie »). */
@@ -161,7 +178,7 @@ const pixels = (p: PhotoInfo) => (p.width ?? 0) * (p.height ?? 0);
  * - quasi identiques : la plus grande (définition), puis le plus gros fichier (moins compressé) ;
  * - similaires : la plus nette.
  */
-export function suggestBest(photos: PhotoInfo[], members: number[], kind: Kind): { best: number; reason: BestReason } {
+export function suggestBest(photos: PhotoInfo[], members: number[], kind: DupKind): { best: number; reason: BestReason } {
   const sorted = [...members].sort((i, j) => {
     const a = photos[i];
     const b = photos[j];
@@ -254,7 +271,7 @@ export function buildGroups(photos: PhotoInfo[], pairs: Pair[], params: Params):
   for (const [root, list] of members) {
     if (list.length < 2) continue;
     const allSame = list.every((i) => photos[i].sha && photos[i].sha === photos[list[0]].sha);
-    const kind: Kind = allSame ? 'exact' : usedSimilar.has(root) ? 'similar' : 'near';
+    const kind: DupKind = allSame ? 'exact' : usedSimilar.has(root) ? 'similar' : 'near';
     const { best, reason } = suggestBest(photos, list, kind);
     const when = (i: number) => photos[i].time ?? photos[i].lastModified;
     const rest = list.filter((i) => i !== best).sort((i, j) => when(i) - when(j) || photos[i].path.localeCompare(photos[j].path));

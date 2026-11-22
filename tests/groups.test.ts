@@ -66,9 +66,12 @@ describe('quasi identiques', () => {
     expect(group(photos)).toHaveLength(1);
   });
 
-  it('images uniformes (noires…) jamais rapprochées par leur empreinte', () => {
+  it('images uniformes (noires…) jamais rapprochées par leur empreinte, ni par le modèle', () => {
     const photos = [photo({ path: 'a.jpg', dhash: '0000000000000000' }), photo({ path: 'b.jpg', dhash: '0000000000000001' })];
     expect(findPairs(photos)).toHaveLength(0);
+    // Deux photos noires prises à 30 s d'écart, vecteurs identiques : pas « similaires » (elles vont dans les inutiles).
+    const black = [photo({ path: 'n1.jpg', dhash: '0000000000000000', time: 0, emb: vec(0) }), photo({ path: 'n2.jpg', dhash: '0000000000000000', time: 30_000, emb: vec(0) })];
+    expect(findPairs(black)).toHaveLength(0);
   });
 
   it('copies exactes et quasi identiques ensemble : groupe « quasi identiques »', () => {

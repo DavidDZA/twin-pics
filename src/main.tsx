@@ -4,6 +4,7 @@ import App from './App';
 import { LANG, T } from './i18n';
 import './styles.css';
 import './sort.css';
+import './junk.css';
 import './theme.css';
 
 document.documentElement.lang = LANG;

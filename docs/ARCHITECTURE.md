@@ -1,7 +1,8 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.3.1 : appli PC en exe,
-> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4 ; habillage plus « fun », § 2.2). Ce qui reste à faire est dans
+> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.4 : appli PC en exe,
+> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4 ; habillage, § 2.2 ; **photos inutiles**
+> et mode swipe, § 4.3). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
 > choix) est dans `DavidDZA\IDEES-APPLIS.md`, idée 1.
 
@@ -45,6 +46,7 @@ Trois écrans (`App.tsx`) :
 | Lecture du dossier | Appli PC : le processus principal liste le dossier (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
 | Analyse | fichiers lus par la page (2 à la fois), analysés dans des workers (`analyze.worker.ts`), un par cœur moins un (6 au plus) ; EXIF par **exifr** |
 | Photos similaires | **Transformers.js** + ONNX Runtime Web, modèle `onnx-community/dinov2-small` : carte graphique (WebGPU, `fp16`, 44 Mo), sinon processeur (WebAssembly, `q8`, 24 Mo) |
+| Photos inutiles | règles sur des mesures de qualité (`quality.ts`) ; modèle **MobileCLIP-S1** (`Xenova/mobileclip_s1`, partie image) : carte graphique (`fp16`, 43 Mo), sinon processeur (`fp32`, 86 Mo) ; phrases livrées avec l'appli (`junkPrompts.json`), § 4.3 |
 | Hébergement | Site : **GitHub Pages** (`https://daviddza.github.io/twin-pics/`), déployé à chaque push sur `main`. Appli PC : *Releases* GitHub, une par version de `package.json` |
 | Tests | **Vitest** (`tests/`, Node : empreintes, regroupement, tri, liste et suppression de l'appli PC sur un vrai dossier temporaire, traductions) ; **Playwright** (`e2e/` : le site, Chrome installé, téléphone et PC ; `e2e-pc/` : la vraie appli Electron ou l'exe) |
 
@@ -60,6 +62,9 @@ src/
     files.ts           une photo trouvée (FoundFile), lecture du dossier sur le site
     filetypes.ts       types de fichiers, dossiers ignorés (partagé avec electron/)
     choices.ts         le tri : garder / supprimer, photos à supprimer, duels (code pur)
+    quality.ts         netteté de la zone la plus nette, luminosité, contraste (code pur)
+    junk.ts            photos inutiles : raisons, scores MobileCLIP, groupes (code pur) ; junkPrompts.json
+    clip.worker.ts     MobileCLIP (vecteur de 512 nombres par photo)
     display.ts         chemins affichés à partir du dossier analysé
     scan.ts            l'analyse de bout en bout (base, lecture, workers, modèle, paires)
     pool.ts            limiter les tâches simultanées (Limiter), faire travailler des workers (WorkerPool)
@@ -74,6 +79,7 @@ src/
 tests/  e2e/  e2e-pc/  Vitest, Playwright site, Playwright appli PC (e2e/photos.ts génère le dossier d'essai)
 scripts/             construction et lancement de l'appli PC, icône (build/icon.ico, depuis public/favicon.svg)
 tools/vitesse/       banc de mesure de vitesse (décodage, modèle sur processeur ou carte graphique), § 3.5
+tools/inutiles/      phrases de MobileCLIP et calibrage des photos inutiles sur un dossier, § 4.3
 ```
 
 ### 2.1 Appli PC (Electron)
@@ -116,13 +122,19 @@ modèle : sur un disque dur (60 à 150 Mo/s), 10 000 photos (56 Go) prenaient 15
 similaires (§ 3.5).
 
 ```
-lecture (la page, 2 fichiers à la fois) → analyse (workers) → modèle (carte graphique, ou 2 workers processeur)
+lecture (la page, 2 fichiers à la fois) → analyse (workers) → modèles (carte graphique, ou 2 workers processeur)
 ```
+
+Deux modèles, chacun s'il est demandé (cases de la page de départ) : DINOv2 (photos similaires, `embed.worker.ts`) et
+MobileCLIP (photos inutiles, `clip.worker.ts`). Ils reçoivent la même petite version de la photo (petit côté de
+256 px, préparée par l'analyse) : toujours une seule lecture du fichier.
 
 1. **Liste** des photos (sous-dossiers compris ; corbeilles et dossiers système ignorés). Images lues : jpg, jpeg,
    png, webp, gif, bmp, avif. HEIC / HEIF (iPhone) et vidéos comptées à part : Chrome ne sait pas ouvrir le HEIC.
 2. **Reprise** : chaque photo a une clé `chemin + taille + date de modification` (`photoKey`) ; une photo déjà en base
-   n'est pas réanalysée. Relancer l'analyse d'un dossier déjà vu prend quelques secondes.
+   n'est pas réanalysée. Relancer l'analyse d'un dossier déjà vu prend quelques secondes. Exception : une photo
+   mesurée avec une autre version des mesures de qualité (`qv` ≠ `QUALITY_VERSION`) est réanalysée — la première
+   analyse en version 0.4 relit donc une fois toutes les photos analysées avant.
 3. **Le modèle se charge** (photos similaires cochées) pendant que l'analyse commence. S'il n'est pas prêt à la fin de
    l'analyse (premier téléchargement), la progression montre son téléchargement.
 4. **Lecture** : la page lit le fichier (`file.arrayBuffer()`), **2 à la fois au plus** (`READS_AT_ONCE` : un disque
@@ -130,18 +142,21 @@ lecture (la page, 2 fichiers à la fois) → analyse (workers) → modèle (cart
    photos en mémoire à la fois.
 5. **Analyse** dans les workers (`analyze.worker.ts`, un par cœur moins un, 6 au plus) :
    - date de prise de vue (`DateTimeOriginal`, sinon `CreateDate`) et appareil (EXIF) ;
-   - décodage avec l'orientation EXIF ; petite version de 256 px → **dHash** ; version de 1024 px → **netteté** ;
+   - décodage avec l'orientation EXIF ; petite version de 256 px → **dHash** ; version de 1024 px → **netteté** et
+     **mesures de qualité** (`quality.ts`, § 4.3) ;
    - **miniature** JPEG de 200 px (table `thumbs`) ;
    - **SHA-256** seulement si un autre fichier a la même taille (deux copies exactes ont forcément la même) ;
-   - **entrée du modèle** (petit côté de 256 px) si la photo est **datée** et les photos similaires demandées.
+   - **entrée des modèles** (petit côté de 256 px) : pour toutes les photos si MobileCLIP est demandé, sinon pour les
+     photos **datées** si les photos similaires le sont (`wantPixels` : `all` / `dated` / `none`).
    Une photo illisible garde `error: 'decode'`.
-6. **Modèle**, au fil de l'analyse : chaque entrée part aussitôt dans le modèle (`embed.worker.ts`). Au plus 64 entrées
+6. **Modèles**, au fil de l'analyse : chaque entrée part aussitôt dans DINOv2 (photo datée) et dans MobileCLIP
+   (toujours ; une copie quand les deux la veulent, elle est transférée). Au plus 64 entrées
    en attente (`MODEL_QUEUE`, ≈ 350 Ko chacune) : au-delà, l'analyse attend le modèle. Toutes les photos datées passent
    dans le modèle (on ne sait qu'à la fin lesquelles ont une voisine dans le temps ; sur la carte graphique, ça ne coûte
    presque rien).
-7. **Photos déjà analysées sans vecteur de ce modèle** (première analyse sans les photos similaires, ou autre version
-   du modèle) : relues, seulement celles qui ont une voisine à moins de 30 min (`needsVector`), en mode `pixels`
-   (décodage seul).
+7. **Photos déjà analysées sans vecteur d'un modèle** (option cochée après coup, autre version du modèle) : relues
+   une seule fois pour tous les modèles qui leur manquent, en mode `pixels` (décodage seul) ; pour DINOv2, seulement
+   celles qui ont une voisine à moins de 30 min (`needsVector`) ; pour MobileCLIP, toutes.
 8. **Paires candidates** (`findPairs`, dans `pairs.worker.ts`) avec les seuils les plus larges des curseurs
    (`LIMITS`) ; ensuite, chaque mouvement de curseur ne fait que `buildGroups` sur ces paires : instantané.
 
@@ -190,6 +205,9 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
 - **Suggestion** (`suggestBest`) : copies exactes → l'originale (pas dans un dossier WhatsApp, Telegram,
   téléchargements, pas de « (1) » ni « Copie » dans le nom ; puis la plus ancienne, puis le chemin le plus court) ;
   quasi identiques → la plus grande définition, puis le plus gros fichier ; similaires → la plus nette.
+- Les images presque uniformes (dHash ≤ 4 ou ≥ 60 bits à 1 : photos noires…) ne sont jamais « quasi identiques »
+  ni « similaires » (le modèle les juge pareilles, mais ce ne sont pas des doublons à départager) : elles vont dans
+  les photos inutiles (§ 4.3).
 - Groupes triés par date ; dans un groupe, la suggestion d'abord, puis par date. Identifiant stable (`groupId`) :
   empreinte des clés des photos, pour retrouver les réponses « Bien trouvé » / « Pas des doublons ».
 - Sous chaque photo, sa ressemblance avec la suggestion : « identique », « n bits d'écart » ou « ressemble à n % ».
@@ -201,6 +219,8 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
 - `thumbs` : miniatures (≈ 10 Ko chacune ; à surveiller pour 50 000 photos : ROADMAP).
 - `labels` : réponses sur les groupes (`groupId`, verdict `good` / `wrong`, nature, clés des photos, réglages du moment).
 - `meta` : `folder` (site : accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre »).
+- `photos` porte aussi, depuis la version 0.4 : `quality` et `qv` (mesures de qualité et leur version), `clip` et
+  `clipModel` (vecteur MobileCLIP et sa version, `clipId(dtype)`).
 - `marks` (version 2 de la base) : le tri, photo par photo (`key`, `mark` = `keep` / `remove`, `groupId`, date), § 4.
 
 ### 3.5 Vitesse (21/11/2026)
@@ -273,6 +293,53 @@ supprimer ; les suppressions faites à la fin, en une fois.
   disparaissent des groupes (`gone`) et leurs choix sont effacés. Les lignes de `photos` restent (une photo remise à
   sa place garde la même clé).
 
+### 4.3 Photos inutiles (`quality.ts`, `junk.ts`, `clip.worker.ts`, 22/11/2026)
+
+Idée de l'utilisateur : une catégorie à côté des doublons pour les photos « pas intéressantes » ; « tout » (floues,
+sombres, poche, captures, documents, tickets, mèmes) ; un modèle téléchargé en plus, « pas de problème » ; les dossiers
+WhatsApp traités comme les autres (filtres par conversation : ROADMAP § 6.1) ; des **groupes** de photos inutiles
+semblables pour en traiter plusieurs d'un coup, **sans filtre de temps** ; un mode **swipe** (je garde / je jette) à la
+place des duels.
+
+- **Mesures** (`measureQuality`, sur la version de 1024 px) : `sharp` = netteté de la **zone la plus nette** (variance
+  du laplacien, grille 4 × 4 ; un portrait au fond flou reste net), `lum` (luminosité moyenne), `dark` / `bright`
+  (part des pixels presque noirs / blancs), `contrast` (écart type).
+- **Raisons** (`junkReasons`), plusieurs possibles :
+  - sans modèle : **presque vide** (contraste < 10 ; rien d'autre alors), **trop sombre** (luminosité < 35 et plus de
+    55 % de pixels noirs), **trop claire** (> 228 et plus de 50 % de blancs), **floue** (`sharp` < `blurMax`, 30),
+    **capture d'écran** (nom « Screenshot », « Capture d'écran »… ; ou PNG sans appareil photo aux proportions d'un
+    écran ; une capture n'est jamais « floue » ni « trop claire ») ;
+  - avec MobileCLIP : chaque photo comparée à 72 phrases (`tools/inutiles/prompts.ts` : catégories document, ticket,
+    capture, mème, prise par erreur, et beaucoup de photos « normales ») ; softmax (échelle 100) ; une catégorie est
+    retenue au-dessus de `clipMin` (70 %). **Prise par erreur** demande en plus une photo ratée (netteté < 300,
+    luminosité < 50 ou contraste < 25) : le modèle seul se trompait sur les grottes, le sol d'une place, des selfies.
+  - l'utilisateur décoche les raisons qu'il ne veut pas voir (`off`).
+- **Les phrases** sont calculées une fois par la partie « texte » du modèle (`node tools/inutiles/calibrer.mjs
+  --phrases`) et livrées (`src/lib/junkPrompts.json`, 72 vecteurs de 512) : l'utilisateur ne télécharge que la partie
+  « image ». Changer une phrase : relancer `--phrases`.
+- **Pas de version `q8`** du modèle : mesuré le 22/11, elle donne des résultats faux (photos de vacances « mèmes » à
+  88 %) ; `fp16` et `fp32` s'accordent.
+- **Calibrage** (22/11, 1 493 photos de voyage de l'utilisateur, `photos test/`) : 49 proposées (3 %), dont une série
+  de 25 photos noires (une poche, à Cuba) ; sur les 24 autres, environ 6 erreurs (un distributeur, un panneau en cœur,
+  un gaufrier…), à corriger par l'utilisateur ou le curseur « certitude ». Netteté des photos : 1 % sous 3,3, 5 % sous
+  350, médiane 4 200. Outils : `calibrer.mjs [dossier] [nombre]` (répartitions, photos retenues par raison,
+  `test-results/calibrage.json`) et `planche.mjs <raison>` (planche contact).
+- **Groupes** (`buildJunkGroups`) : parmi les photos inutiles qui ne sont dans aucun groupe de doublons, deux photos
+  qui partagent une raison sont reliées si MobileCLIP les juge proches (`groupMin`, 85 %), si leurs dHash sont à 6 bits
+  au plus, ou si elles sont toutes deux presque vides ; même garde-fou contre les chaînes que les similaires ;
+  **aucune limite de temps**. Plus gros groupes d'abord. Identifiant `j…`, pas de suggestion (`best` = −1), raisons par
+  photo et raison principale (`junk`). Au-delà de 4 000 photos inutiles, pas de regroupement par le modèle (à mesurer).
+- **Interface** : onglet « Inutiles » (sa case « photos inutiles », ses réglages `JunkSettings` : raisons à cocher,
+  curseurs netteté, certitude du modèle, ressemblance pour regrouper ; retenus : `junk-params`), cartes avec la raison
+  principale et les raisons de chaque photo, « Bien trouvé » / « Pas inutiles ». Option de la page de départ
+  « Reconnaître aussi les documents, tickets et mèmes » (`opt-junk-model`, cochée par défaut).
+- **Tri** : par défaut, **tout le groupe à jeter** (pas de suggestion). « Affichage : Grille | Swipe » (retenu à part :
+  `junk-view` ; swipe par défaut au téléphone). **Swipe** (`SwipeCard`) : une carte (une photo, ou une mosaïque de 4
+  avec « +n » pour un groupe : « n photos semblables », raisons, taille, date), glissée à la souris ou au doigt
+  (au-delà de 110 px ; tampons « Je garde » / « Je jette » qui apparaissent avec le geste), boutons « ✕ Je jette » /
+  « ✓ Je garde », flèches ← → ; la décision vaut pour tout le groupe et passe au suivant. La grille reste là pour
+  garder une partie d'un groupe.
+
 ## 5. Traduction
 
 6 langues, ton familier. Langue de l'appareil si elle est traduite, sinon l'anglais ; choix en bas de page
@@ -291,6 +358,12 @@ durées par `Intl` (`bytes`, `duration`).
   réglage, images uniformes écartées, similaires selon la ressemblance et l'écart de temps, garde-fou contre les
   chaînes, photos sans date jamais similaires, ordre et identifiant des groupes, photos qui ont besoin du modèle) ;
   traductions (dont : le dossier « À supprimer » n'est jamais analysé, dans toutes les langues).
+- **Photos inutiles** (`junk.test.ts`) : mesures sur des images générées (nette, floue partout, sujet net sur fond
+  flou, sombre, brûlée, vide), chaque règle, captures par le nom ou les proportions, certitude du modèle, « prise par
+  erreur » seulement si ratée, raisons décochées, phrases livrées (normalisées, toutes les catégories), groupes sans
+  limite de temps, raisons différentes jamais ensemble, photos de doublons à part, garde-fou contre les chaînes,
+  regroupement par dHash sans le modèle, tout à jeter par défaut. Images uniformes jamais « similaires »
+  (`groups.test.ts`).
 - **Tri** (`choices.test.ts`) : suggestion seule par défaut, en garder plusieurs ou aucune, groupe trié ou non, choix
   repris, photos à supprimer et place libérée, « tout supprimer » signalé, photo marquée hors groupe jamais supprimée,
   duels (la gagnante affronte la suivante, groupe de deux photos).
@@ -314,10 +387,17 @@ sans elles (photos déjà vues complétées).
   lien vers l'appli PC ; grille (« Tout garder », « Passer », « Revoir les groupes passés », choix changé dans la
   visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; téléphone : duel l'une sous l'autre en
   portrait, côte à côte en paysage (760 × 393), résumé sans défilement horizontal. Captures dans `test-results/`.
+- **Playwright, photos inutiles** (`e2e/inutiles.spec.ts`, dossier d'essai `Ratées` : deux photos noires, une floue,
+  une sombre, deux captures, une page de texte) : onglet (6 groupes, 7 photos, les noires regroupées, raisons), réglages
+  (décocher « Floue »), swipe (bouton, clavier, geste à la souris, geste trop court sans effet, puis récapitulatif),
+  grille (tout à jeter par défaut, plein écran), téléphone (swipe par défaut, carte et boutons à l'écran en portrait et
+  en paysage) ; avec `E2E_MODELE=1` : page de texte « Document », photos noires « Prise par erreur », sur la carte
+  graphique et sur le processeur.
 - **Playwright, appli PC** (`npm run e2e:pc`, `e2e-pc/appli.spec.ts`, vraie appli Electron, copie du dossier
   d'essai) : photos d'origine lues par `app://`, grille, récapitulatif, Corbeille (dossier d'essai), dossier « À
   supprimer » (sous-dossiers, ignoré par la nouvelle analyse), annulation, disque sans Corbeille, « Tout supprimer »
-  et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant ; avec `E2E_MODELE=1`, photos similaires
+  et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant, photos inutiles triées en swipe puis à la
+  Corbeille ; avec `E2E_MODELE=1`, photos similaires
   sur la carte graphique.
 
 ## 7. Conventions

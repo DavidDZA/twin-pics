@@ -32,9 +32,10 @@ import {
   type Pending,
 } from '../lib/choices';
 import { PhotoImage } from './PhotoImage';
-import { likenessText, photoDetails } from './photoText';
+import { likenessText, photoDetails, reasonsText } from './photoText';
 import { useThumbs } from './useThumbs';
-import { useView, type SortView } from './useView';
+import { SwipeCard } from './SwipeCard';
+import { useView, VIEWS, type SortView } from './useView';
 import { Viewer } from './Viewer';
 
 /** Au-delà, la grille montre les miniatures (une photo de 12 Mpx décodée occupe ≈ 48 Mo). */
@@ -54,7 +55,11 @@ interface Props {
 
 export function Sorter({ groups, start, photos, files, marks, pending, onSave, onRemove, onClose }: Props) {
   const [index, setIndex] = useState(start);
-  const [view, setView] = useView();
+  // Doublons : grille ou duels ; photos inutiles : grille ou swipe (la file ne mélange jamais les deux).
+  const family = groups[0]?.kind === 'junk' ? 'junk' : 'dup';
+  const [view, setView] = useView(family);
+  const title = family === 'junk' ? T.sort.startJunk : T.sort.start;
+  const viewName: Record<SortView, string> = { grid: T.sort.grid, duel: T.sort.duels, swipe: T.sort.swipe };
   /** Groupes passés pendant ce tri : proposés à la fin. */
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
 
@@ -84,14 +89,14 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
   const unsortedLeft = groups.filter((g) => !isSorted(g, photos, marks)).length;
 
   return createPortal(
-    <div className="sorter" role="dialog" aria-modal="true" aria-label={T.sort.start}>
+    <div className="sorter" role="dialog" aria-modal="true" aria-label={title}>
       <div className="sorter-bar">
-        <strong className="where">{group ? T.sort.groupOf(index + 1, groups.length) : T.sort.start}</strong>
+        <strong className="where">{group ? T.sort.groupOf(index + 1, groups.length) : title}</strong>
         <div className="view-switch" role="group" aria-label={T.sort.view}>
           <span className="muted small">{T.sort.view}</span>
-          {(['grid', 'duel'] as SortView[]).map((v) => (
+          {VIEWS[family].map((v) => (
             <button key={v} className={view === v ? 'toggle on' : 'toggle'} aria-pressed={view === v} onClick={() => setView(v)}>
-              {v === 'grid' ? T.sort.grid : T.sort.duels}
+              {viewName[v]}
             </button>
           ))}
         </div>
@@ -160,8 +165,9 @@ interface GroupProps {
 
 function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSkip, onValidate }: GroupProps) {
   const [choice, setChoice] = useState<Choice>(() => initialChoice(group, photos, marks));
-  const canDuel = group.members.length > 2;
+  const canDuel = group.members.length > 2 && !group.junk;
   const [duel, setDuel] = useState<Duel | null>(() => (view === 'duel' && canDuel && !isSorted(group, photos, marks) ? startDuel(group) : null));
+  const swiping = view === 'swipe' && !!group.junk;
   const [viewing, setViewing] = useState<number | null>(null);
   const keys = useMemo(() => group.members.map((i) => photos[i].key), [group, photos]);
   const thumbs = useThumbs(keys);
@@ -171,7 +177,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
   const remove = group.members.length - keep;
 
   useEffect(() => {
-    if (inDuel || viewing !== null) return;
+    if (inDuel || swiping || viewing !== null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       const n = Number(e.key);
@@ -185,7 +191,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [inDuel, viewing, group, photos, choice, onValidate]);
+  }, [inDuel, swiping, viewing, group, photos, choice, onValidate]);
 
   const pick = (winner: number) => {
     const next = pickWinner(duel!, winner);
@@ -196,11 +202,12 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
   const head = (
     <div className="sorter-head">
       <span className={`chip ${group.kind}`}>{T.results.kinds[group.kind]}</span>
+      {group.junk && <span className="chip junk-reason">{reasonsText([group.junk.main])}</span>}
       <span>{T.group.photos(group.members.length)}</span>
       <span className="muted">{photos[group.members[0]].time ? dateTime(photos[group.members[0]].time!) : T.group.noDate}</span>
       {inDuel ? (
         <span className="muted">{T.sort.duelOf(duel!.next, group.members.length - 1)}</span>
-      ) : (
+      ) : swiping ? null : (
         <span className="muted" data-testid="counts">
           {T.sort.counts(keep, remove)}
         </span>
@@ -220,6 +227,32 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
         onToggle={inDuel ? undefined : (key) => setChoice((c) => toggle(c, key))}
       />
     ) : null;
+
+  if (swiping) {
+    return (
+      <div className="sorter-body swipe-body">
+        {head}
+        <SwipeCard
+          group={group}
+          photos={photos}
+          files={files}
+          thumbs={thumbs}
+          paused={viewing !== null}
+          onDecide={(mark) => onValidate(allAs(group, photos, mark))}
+          onZoom={() => setViewing(0)}
+        />
+        <div className="sorter-actions">
+          <button className="secondary" onClick={onPrev} disabled={!hasPrev}>
+            ‹ {T.sort.prev}
+          </button>
+          <button className="secondary" onClick={onSkip}>
+            {T.sort.skip} ›
+          </button>
+        </div>
+        {viewer}
+      </div>
+    );
+  }
 
   if (inDuel) {
     const pair = [duel!.champion, challenger(duel!)];
@@ -321,9 +354,11 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
       )}
       <div className="sorter-actions">
         <div className="quick">
-          <button className="secondary" onClick={() => setChoice(suggestionOnly(group, photos))}>
-            {T.sort.suggestionOnly}
-          </button>
+          {!group.junk && (
+            <button className="secondary" onClick={() => setChoice(suggestionOnly(group, photos))}>
+              {T.sort.suggestionOnly}
+            </button>
+          )}
           <button className="secondary" onClick={() => setChoice(allAs(group, photos, 'keep'))}>
             {T.sort.keepAll}
           </button>

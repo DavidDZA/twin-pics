@@ -24,7 +24,12 @@
 > visionneuse (et glisser le doigt) ; habillage plus « fun » (ARCHITECTURE § 2.2). Question ouverte : détecter les
 > photos « pas intéressantes » (§ 6.1), en discussion avant de coder.
 >
-> **Reprendre ici** : retour de l'utilisateur sur l'exe (télécharger `Twin Pics 0.3.0.exe` dans les *Releases*,
+> (22/11) **Version 0.4, photos inutiles** (ARCHITECTURE § 4.3) : onglet « Inutiles » (floues, sombres, claires,
+> presque vides, captures par des règles ; documents, tickets, mèmes, prises par erreur par MobileCLIP), regroupées sans
+> limite de temps, mode **swipe** (je garde / je jette) ; seuils calibrés sur 1 493 photos de l'utilisateur. La
+> première analyse en 0.4 relit une fois toutes les photos (nouvelles mesures, et MobileCLIP).
+>
+> **Reprendre ici** : retour de l'utilisateur sur l'exe 0.4 (télécharger `Twin.Pics.0.4.0.exe` dans les *Releases*,
 > l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Puis § 3 (ménage des
 > copies exactes en un bouton…) ou § 5.3 (appli Android).
 
@@ -113,14 +118,19 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 
 ## 6. Plus tard
 
-### 6.1 Photos « pas intéressantes » (idée de l'utilisateur, 22/11/2026)
+### 6.1 Photos inutiles : la suite
 
-Une nouvelle catégorie à côté des doublons : photos floues, ratées (trop sombres, brûlées, prises dans la poche),
-captures d'écran, photos de documents ou de tickets, images reçues par messagerie. Pistes proposées à l'utilisateur,
-à décider avant de coder : d'abord des règles simples sur ce que l'analyse calcule déjà ou presque (netteté, exposition,
-image presque uniforme, format d'écran sans appareil photo dans l'EXIF, dossier WhatsApp…), chaque photo avec sa
-raison ; ensuite un modèle qui comprend des phrases (CLIP / MobileCLIP) pour « un ticket de caisse », « une capture
-d'écran », « une photo floue » ; enfin, apprendre des choix de l'utilisateur.
+~~Règles simples et MobileCLIP, groupes sans limite de temps, mode swipe~~ — fait le 22/11 (0.4, ARCHITECTURE § 4.3).
+Restent :
+
+- **WhatsApp par conversation ou groupe** (demandé le 22/11, « on verra plus tard ») : filtrer les images reçues par
+  conversation, et marquer une conversation « normale » ou « poubelle » (tout ce qui en vient est proposé). Sur PC, les
+  images WhatsApp n'indiquent pas la conversation (dossier unique `WhatsApp Images`) : il faudra l'export de
+  conversation, ou le téléphone (Android : dossiers par conversation dans certaines versions, à vérifier).
+- Apprendre des choix de l'utilisateur (« Bien trouvé » / « Pas inutiles », tri) pour ajuster les seuils, voire un
+  petit classifieur sur les vecteurs MobileCLIP.
+- Mesurer la vitesse de MobileCLIP sur 10 000 photos (carte graphique, processeur) et le regroupement au-delà de
+  4 000 photos inutiles.
 
 Captures d'écran, photos floues ou ratées, mèmes reçus, vidéos en double ; visages et yeux ouverts (MediaPipe, local)
 pour la suggestion ; préférences apprises des duels.

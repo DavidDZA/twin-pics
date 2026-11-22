@@ -1,16 +1,19 @@
 /**
  * L'analyse d'un dossier, de bout en bout. **Chaque photo n'est lue qu'une fois** sur le disque (un disque dur lit
- * environ 60 à 150 Mo/s : relire le dossier pour le modèle doublait le temps) :
+ * environ 60 à 150 Mo/s : relire le dossier pour un modèle doublait le temps) :
  *
- *   lecture (2 fichiers à la fois) → analyse (un worker par cœur) → modèle (carte graphique, ou processeur)
+ *   lecture (2 fichiers à la fois) → analyse (un worker par cœur) → modèles (carte graphique, ou processeur)
  *
  * 1. liste des photos (fait avant, `files.ts`) ;
- * 2. reprise de ce qui est déjà en base (photos inchangées : rien à refaire) ;
- * 3. le modèle des photos similaires se charge pendant que l'analyse commence ;
- * 4. chaque nouvelle photo est lue, analysée (`analyze.worker.ts`) et, si elle est datée, passe aussitôt dans le
- *    modèle (`embed.worker.ts`) : la petite version préparée par l'analyse suffit, pas de second décodage ;
- * 5. les photos déjà analysées mais sans vecteur (première analyse sans les photos similaires, autre version du
- *    modèle) sont relues, seulement celles qui ont une voisine dans le temps ;
+ * 2. reprise de ce qui est déjà en base (photos inchangées : rien à refaire ; mesurées avec une ancienne version des
+ *    mesures de qualité : réanalysées) ;
+ * 3. les modèles se chargent pendant que l'analyse commence : DINOv2 (photos similaires, `embed.worker.ts`) et
+ *    MobileCLIP (photos inutiles, `clip.worker.ts`), chacun s'il est demandé ;
+ * 4. chaque nouvelle photo est lue, analysée (`analyze.worker.ts`) et passe aussitôt dans les modèles : DINOv2 si
+ *    elle est datée, MobileCLIP toujours ; la petite version préparée par l'analyse suffit, pas de second décodage ;
+ * 5. les photos déjà analysées mais sans vecteur d'un modèle (option cochée après coup, autre version du modèle) sont
+ *    relues une fois pour tous les modèles qui leur manquent (DINOv2 : seulement celles qui ont une voisine dans le
+ *    temps) ;
  * 6. paires candidates (`findPairs`, dans un worker : la comparaison de toutes les photos deux à deux).
  */
 import { db, photoKey, type PhotoRow } from './db';
@@ -19,8 +22,11 @@ import type { AnalyzeRequest, AnalyzeResult, EmbedMessage, EmbedRequest, ModelDe
 import type { FoundFile, Listing } from './files';
 import { nameOf } from './filetypes';
 import { DEVICE_KEY, embedId } from './model';
+import { clipId } from './junk';
+import { QUALITY_VERSION } from './quality';
 import { Limiter, WorkerPool } from './pool';
 
+/** `model` : téléchargement des modèles ; `similar` : passage des photos dans les modèles. */
 export type Phase = 'analyze' | 'model' | 'similar' | 'pairs';
 
 export interface Progress {
@@ -30,7 +36,10 @@ export interface Progress {
 }
 
 export interface ScanOptions {
+  /** Photos similaires (DINOv2). */
   similar: boolean;
+  /** Photos inutiles reconnues par le modèle (MobileCLIP) ; les règles simples marchent sans. */
+  junkModel: boolean;
   signal: AbortSignal;
   onProgress: (p: Progress) => void;
 }
@@ -50,13 +59,16 @@ export interface ScanResult {
   device?: ModelDevice;
   /** Le modèle n'a pas pu être chargé (hors ligne…) : pas de photos similaires. */
   modelError?: string;
+  /** Où a tourné MobileCLIP ; s'il n'a pas pu être chargé. */
+  clipDevice?: ModelDevice;
+  clipError?: string;
   seconds: number;
 }
 
 const SAVE_EVERY = 100;
 /** Fichiers lus en même temps : un disque dur ralentit beaucoup s'il doit sauter d'un fichier à l'autre. */
 const READS_AT_ONCE = 2;
-/** Petites versions en attente du modèle (≈ 350 Ko chacune) : au-delà, l'analyse attend le modèle. */
+/** Petites versions en attente des modèles (≈ 350 Ko chacune) : au-delà, l'analyse attend les modèles. */
 const MODEL_QUEUE = 64;
 
 function abortError(): DOMException {
@@ -77,7 +89,7 @@ function forcedDevice(): 'auto' | 'wasm' {
   }
 }
 
-function toInfo(row: PhotoRow, modelId: string | undefined): PhotoInfo {
+function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string | undefined): PhotoInfo {
   return {
     key: row.key,
     path: row.path,
@@ -91,6 +103,9 @@ function toInfo(row: PhotoRow, modelId: string | undefined): PhotoInfo {
     sharpness: row.sharpness,
     width: row.width,
     height: row.height,
+    camera: row.camera,
+    quality: row.quality,
+    clip: clipModelId && row.clipModel === clipModelId ? row.clip : undefined,
   };
 }
 
@@ -111,11 +126,14 @@ interface Model {
   device: ModelDevice;
 }
 
-/** Charge le modèle dans un worker (et un second sur le processeur, deux fois plus rapide à deux). */
-async function loadModel(onBytes: (loaded: number, total: number) => void): Promise<Model> {
+/**
+ * Charge un modèle dans un worker (et un second sur le processeur, deux fois plus rapide à deux). `make` crée le
+ * worker (écrit en toutes lettres pour que Vite l'empaquette) ; `idOf` nomme la version du modèle.
+ */
+async function loadModel(make: () => Worker, idOf: (dtype: string) => string, onBytes: (loaded: number, total: number) => void): Promise<Model> {
   const start = (device: 'auto' | 'wasm') =>
     new Promise<{ worker: Worker; device: ModelDevice; dtype: string }>((resolve, reject) => {
-      const worker = new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' });
+      const worker = make();
       worker.onmessage = (e: MessageEvent<EmbedMessage>) => {
         const m = e.data;
         if (m.type === 'progress') onBytes(m.loaded, m.total);
@@ -140,7 +158,15 @@ async function loadModel(onBytes: (loaded: number, total: number) => void): Prom
       // Un seul worker : plus lent, mais ça marche.
     }
   }
-  return { pool: new WorkerPool(workers), id: embedId(first.dtype), device: first.device };
+  return { pool: new WorkerPool(workers), id: idOf(first.dtype), device: first.device };
+}
+
+/** Un modèle demandé : son chargement, et ce qu'on en sait une fois chargé. */
+interface Slot {
+  promise: Promise<Model | null>;
+  model: Model | null;
+  error?: string;
+  bytes: { loaded: number; total: number };
 }
 
 export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanResult> {
@@ -163,27 +189,37 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   const sizeCount = new Map<number, number>();
   for (const r of rows.values()) sizeCount.set(r.size, (sizeCount.get(r.size) ?? 0) + 1);
   const needSha = (r: PhotoRow) => sizeCount.get(r.size)! > 1 && !r.sha;
-  const todo = [...rows.values()].filter((r) => (!r.dhash && !r.error) || needSha(r));
+  // À analyser : les nouvelles photos, celles mesurées avec une ancienne version des mesures de qualité.
+  const todo = [...rows.values()].filter((r) => (!r.dhash && !r.error) || needSha(r) || (!r.error && r.qv !== QUALITY_VERSION));
 
-  // Le modèle se charge pendant que l'analyse commence.
-  let modelBytes = { loaded: 0, total: 0 };
-  let modelPromise: Promise<Model | null> = Promise.resolve(null);
-  let modelError: string | undefined;
-  let model: Model | null = null;
-  /** Analyse finie, modèle pas encore prêt : la progression montre son téléchargement. */
+  // Les modèles se chargent pendant que l'analyse commence.
+  /** Analyse finie, modèles pas encore prêts : la progression montre leur téléchargement. */
   let waitingForModel = false;
-  if (opts.similar) {
-    modelPromise = loadModel((loaded, total) => {
-      modelBytes = { loaded, total };
-      if (waitingForModel) onProgress({ phase: 'model', done: loaded, total });
+  const slots: Slot[] = [];
+  const showBytes = () => {
+    if (!waitingForModel) return;
+    const loaded = slots.reduce((s, x) => s + x.bytes.loaded, 0);
+    const total = slots.reduce((s, x) => s + x.bytes.total, 0);
+    onProgress({ phase: 'model', done: loaded, total });
+  };
+  const slot = (load: (onBytes: (l: number, t: number) => void) => Promise<Model>): Slot => {
+    const s: Slot = { promise: Promise.resolve(null), model: null, bytes: { loaded: 0, total: 0 } };
+    s.promise = load((loaded, total) => {
+      s.bytes = { loaded, total };
+      showBytes();
     }).then(
-      (m) => (model = m),
+      (m) => (s.model = m),
       (err) => {
-        modelError = String(err?.message ?? err);
+        s.error = String(err?.message ?? err);
         return null;
       },
     );
-  }
+    slots.push(s);
+    return s;
+  };
+  const dino = opts.similar ? slot((b) => loadModel(() => new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' }), embedId, b)) : null;
+  const clip = opts.junkModel ? slot((b) => loadModel(() => new Worker(new URL('./clip.worker.ts', import.meta.url), { type: 'module' }), clipId, b)) : null;
+  const wantPixels: AnalyzeRequest['wantPixels'] = clip ? 'all' : dino ? 'dated' : 'none';
 
   const analyzers = new WorkerPool<AnalyzeRequest, AnalyzeResult>(
     Array.from({ length: Math.max(1, Math.min(poolSize(), todo.length || 1)) }, () => new Worker(new URL('./analyze.worker.ts', import.meta.url), { type: 'module' })),
@@ -193,7 +229,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   const modelQueue = new Limiter(MODEL_QUEUE);
   const onAbort = () => {
     analyzers.terminate(abortError());
-    void modelPromise.then((m) => m?.pool.terminate(abortError()));
+    for (const s of slots) void s.promise.then((m) => m?.pool.terminate(abortError()));
   };
   signal.addEventListener('abort', onAbort, { once: true });
 
@@ -207,22 +243,21 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
     if (t.length) await db.thumbs.bulkPut(t);
   };
 
-  // Le modèle, pour une photo : attend son tour (au plus MODEL_QUEUE en attente), puis le vecteur.
+  // Un modèle, pour une photo : attend son tour (au plus MODEL_QUEUE en attente), puis le vecteur.
   let vectorsAsked = 0;
   let vectorsDone = 0;
   let analysisDone = false;
   const modelJobs: Promise<void>[] = [];
-  const toModel = async (row: PhotoRow, pixels: Pixels) => {
+  const toModel = async (row: PhotoRow, pixels: Pixels, s: Slot, save: (row: PhotoRow, vector: Float32Array, id: string) => void) => {
     await modelQueue.acquire();
     vectorsAsked++;
     const job = (async () => {
       try {
-        const m = await modelPromise;
+        const m = await s.promise;
         if (!m || signal.aborted) return;
         const msg = await m.pool.call({ type: 'embed', id: 0, pixels }, [pixels.data.buffer]);
         if (msg.type === 'vector') {
-          row.emb = msg.vector;
-          row.embModel = m.id;
+          save(row, msg.vector, m.id);
           pendingRows.push(row);
         }
       } finally {
@@ -232,6 +267,17 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
       }
     })();
     modelJobs.push(job.catch(() => undefined));
+  };
+  const saveDino = (row: PhotoRow, v: Float32Array, id: string) => ((row.emb = v), (row.embModel = id));
+  const saveClip = (row: PhotoRow, v: Float32Array, id: string) => ((row.clip = v), (row.clipModel = id));
+  /** Envoie la petite version aux modèles qui en ont besoin (une copie pour le second : elle est transférée). */
+  const toModels = async (row: PhotoRow, pixels: Pixels, needDino: boolean, needClip: boolean) => {
+    if (needDino && dino && needClip && clip) {
+      const copy: Pixels = { ...pixels, data: new Uint8ClampedArray(pixels.data) };
+      await toModel(row, copy, dino, saveDino);
+      await toModel(row, pixels, clip, saveClip);
+    } else if (needDino && dino) await toModel(row, pixels, dino, saveDino);
+    else if (needClip && clip) await toModel(row, pixels, clip, saveClip);
   };
 
   /** Lit le fichier d'une photo (2 à la fois) et le confie à un worker d'analyse. */
@@ -246,60 +292,58 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
         inFlight.run(async () => {
           if (signal.aborted) throw abortError();
           const buffer = await read(row);
-          const res = await analyzers.call({ id: 0, buffer, mode: 'full', needSha: needSha(row), wantPixels: opts.similar }, [buffer]);
+          const res = await analyzers.call({ id: 0, buffer, mode: 'full', needSha: needSha(row), wantPixels }, [buffer]);
           const { thumb, pixels, id: _id, ok, ...fields } = res;
-          Object.assign(row, fields, { error: ok ? undefined : res.error });
+          Object.assign(row, fields, { error: ok ? undefined : res.error, qv: QUALITY_VERSION });
           pendingRows.push(row);
           if (thumb) pendingThumbs.push({ key: row.key, blob: thumb });
           analyzed++;
           if (analyzed % SAVE_EVERY === 0) writes.push(flush());
           onProgress({ phase: 'analyze', done: analyzed, total: todo.length });
-          if (pixels) await toModel(row, pixels);
+          if (pixels) await toModels(row, pixels, row.time !== undefined, true);
         }),
       ),
     );
     analysisDone = true;
 
-    if (opts.similar) {
-      // Le modèle n'est pas encore prêt (premier téléchargement) : on le montre.
-      if (!model && !modelError) {
+    if (slots.length) {
+      // Les modèles ne sont pas encore prêts (premier téléchargement) : on le montre.
+      if (slots.some((s) => !s.model && !s.error)) {
         waitingForModel = true;
-        onProgress({ phase: 'model', done: modelBytes.loaded, total: modelBytes.total });
-        await modelPromise;
+        showBytes();
+        await Promise.all(slots.map((s) => s.promise));
         waitingForModel = false;
       }
       if (signal.aborted) throw abortError();
-      const m = model as Model | null;
-      if (m) {
-        // Photos déjà analysées sans vecteur de ce modèle : relues, seulement celles qui ont une voisine.
-        const asked = new Set(todo.filter((r) => r.time !== undefined && !r.error).map((r) => r.key));
-        const missing = needsVector([...rows.values()]).filter((r) => r.embModel !== m.id && !asked.has(r.key));
-        onProgress({ phase: 'similar', done: vectorsDone, total: vectorsAsked + missing.length });
-        await Promise.all(
-          missing.map((row) =>
-            inFlight.run(async () => {
-              if (signal.aborted) throw abortError();
-              const buffer = await read(row);
-              const res = await analyzers.call({ id: 0, buffer, mode: 'pixels', needSha: false, wantPixels: true }, [buffer]);
-              if (res.pixels) await toModel(row, res.pixels);
-            }),
-          ),
-        );
-        await Promise.all(modelJobs);
-      }
+      // Photos déjà analysées sans vecteur d'un modèle : relues une fois pour tous les modèles qui leur manquent.
+      const asked = new Set(todo.filter((r) => !r.error).map((r) => r.key));
+      const dinoMissing = new Set(dino?.model ? needsVector([...rows.values()]).filter((r) => r.embModel !== dino.model!.id && !asked.has(r.key)).map((r) => r.key) : []);
+      const clipMissing = new Set(clip?.model ? [...rows.values()].filter((r) => !r.error && r.clipModel !== clip.model!.id && !asked.has(r.key)).map((r) => r.key) : []);
+      const missing = [...rows.values()].filter((r) => dinoMissing.has(r.key) || clipMissing.has(r.key));
+      onProgress({ phase: 'similar', done: vectorsDone, total: vectorsAsked + dinoMissing.size + clipMissing.size });
+      await Promise.all(
+        missing.map((row) =>
+          inFlight.run(async () => {
+            if (signal.aborted) throw abortError();
+            const buffer = await read(row);
+            const res = await analyzers.call({ id: 0, buffer, mode: 'pixels', needSha: false, wantPixels: 'all' }, [buffer]);
+            if (res.pixels) await toModels(row, res.pixels, dinoMissing.has(row.key), clipMissing.has(row.key));
+          }),
+        ),
+      );
+      await Promise.all(modelJobs);
     }
     if (signal.aborted) throw abortError();
   } finally {
     signal.removeEventListener('abort', onAbort);
     analyzers.terminate();
-    void modelPromise.then((m) => m?.pool.terminate());
+    for (const s of slots) void s.promise.then((m) => m?.pool.terminate());
     writes.push(flush());
     await Promise.all(writes);
   }
 
   // Paires candidates.
-  const modelId = opts.similar ? (model as Model | null)?.id : undefined;
-  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, modelId));
+  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dino?.model?.id, clip?.model?.id));
   onProgress({ phase: 'pairs', done: 0, total: photos.length });
   const pairs = await computePairs(photos, signal);
 
@@ -311,8 +355,10 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
     unsupported: listing.unsupported,
     videos: listing.videos,
     analyzed,
-    device: (model as Model | null)?.device,
-    modelError: opts.similar ? modelError : undefined,
+    device: dino?.model?.device,
+    modelError: dino?.error,
+    clipDevice: clip?.model?.device,
+    clipError: clip?.error,
     seconds: (performance.now() - start) / 1000,
   };
 }
