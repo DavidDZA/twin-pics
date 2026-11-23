@@ -54,7 +54,7 @@ jobs:
             $app = Get-Process 'Twin Pics' -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*Twin Pics Portable*' }
             if ($app) { break }
           }
-          if (-not $app) { throw 'l’appli ne s’est pas ouverte' }
+          if (-not $app) { throw 'Twin Pics pas ouvert au bout de 2 min' }
           "ouverte : $($app[0].Path)"
           Stop-Process -Name 'Twin Pics' -Force
       - name: Release
