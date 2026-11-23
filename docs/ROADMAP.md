@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 22/11/2026. Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 23/11/2026. Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -21,17 +21,30 @@
 >
 > (22/11, retour de l'utilisateur) **Version 0.3.1** : un groupe de deux photos va directement au résumé en mode
 > duels ; bouton « Plein écran » sur chaque photo (grille et duels) ; flèches à gauche et à droite dans la
-> visionneuse (et glisser le doigt) ; habillage plus « fun » (ARCHITECTURE § 2.2). Question ouverte : détecter les
-> photos « pas intéressantes » (§ 6.1), en discussion avant de coder.
+> visionneuse (et glisser le doigt) ; habillage plus « fun » (ARCHITECTURE § 2.2). Idée de l'utilisateur : détecter
+> les photos « pas intéressantes » — discutée, puis faite en 0.4.
 >
 > (22/11) **Version 0.4, photos inutiles** (ARCHITECTURE § 4.3) : onglet « Inutiles » (floues, sombres, claires,
 > presque vides, captures par des règles ; documents, tickets, mèmes, prises par erreur par MobileCLIP), regroupées sans
 > limite de temps, mode **swipe** (je garde / je jette) ; seuils calibrés sur 1 493 photos de l'utilisateur. La
 > première analyse en 0.4 relit une fois toutes les photos (nouvelles mesures, et MobileCLIP).
 >
+> (23/11) L'utilisateur essaiera l'exe 0.4 plus tard ; rien de nouveau à coder en attendant.
+>
 > **Reprendre ici** : retour de l'utilisateur sur l'exe 0.4 (télécharger `Twin.Pics.0.4.0.exe` dans les *Releases*,
-> l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Puis § 3 (ménage des
-> copies exactes en un bouton…) ou § 5.3 (appli Android).
+> l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Lui demander :
+>
+> - les **durées** : la première analyse en 0.4 relit tout (≈ 15 min pour 10 000 photos sur disque dur, plus les deux
+>   modèles) ; la vitesse de MobileCLIP sur 10 000 photos n'est pas encore mesurée (§ 6.1) ; ligne « reconnues par
+>   la carte graphique / le processeur » ;
+> - l'onglet **Inutiles** : combien de photos proposées, les erreurs (« Pas inutiles ») et les oubliées, les
+>   raisons à décocher, les curseurs touchés (seuils par défaut à revoir : ARCHITECTURE § 4.3) ;
+> - le **swipe** (geste, clavier, groupes en mosaïque) et la **grille** sur un grand groupe ;
+> - les **doublons** : les photos noires ne sont plus « similaires » (elles vont dans les inutiles) ;
+> - la **suppression** : Corbeille ou dossier « À supprimer », annulation.
+>
+> Ensuite : § 3 (ménage des copies exactes en un bouton…), § 5.3 (appli Android) ou § 6.1 (WhatsApp par
+> conversation).
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -60,6 +73,8 @@
    les vraies données). Il faudra un **export des réponses** (labels + scores des paires) pour le faire hors de l'appli.
 4. Groupes manqués : ajouter un moyen de dire « ces deux photos sont des doublons » (aujourd'hui, seules les erreurs
    des groupes trouvés se voient).
+5. Photos inutiles (0.4) : même démarche — réponses « Bien trouvé » / « Pas inutiles », mesures de qualité et scores
+   MobileCLIP exportés, pour revoir `blurMax`, `clipMin` et `groupMin` (calibrage de départ : ARCHITECTURE § 4.3).
 
 Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « similaire » veut dire pour l'utilisateur
 (rafales, même scène à quelques minutes, copies retouchées).
