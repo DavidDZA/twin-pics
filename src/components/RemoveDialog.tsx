@@ -17,6 +17,8 @@ const SHOWN = 60;
 
 interface Props {
   pending: Pending;
+  /** Toutes les copies exactes d'un coup (sans tri) : la fenêtre le rappelle. */
+  exact: boolean;
   photos: PhotoInfo[];
   /** Dossier analysé (appli PC) ; `null` sur le site. */
   root: string | null;
@@ -28,7 +30,7 @@ interface Props {
   onConfirm: () => void;
 }
 
-export function RemoveDialog({ pending, photos, root, settings, onSettings, working, onCancel, onConfirm }: Props) {
+export function RemoveDialog({ pending, exact, photos, root, settings, onSettings, working, onCancel, onConfirm }: Props) {
   const canRemove = !!desktop && !!root;
   const folder = root ? removeFolder(settings, root, T.remove.folderName) : '';
 
@@ -50,6 +52,7 @@ export function RemoveDialog({ pending, photos, root, settings, onSettings, work
         <p data-testid="remove-summary">
           <strong>{T.remove.summary(pending.remove.length, bytes(pending.bytes), pending.keep, pending.plans.length)}</strong>
         </p>
+        {exact && <p>{T.exact.note}</p>}
         {pending.noneKept > 0 && (
           <p className="warning" role="alert">
             {T.remove.noneKept(pending.noneKept)}

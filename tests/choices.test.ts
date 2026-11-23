@@ -3,6 +3,7 @@ import { buildGroups, DEFAULTS, findPairs, type Group, type PhotoInfo } from '..
 import {
   allAs,
   challenger,
+  exactCleanup,
   duelDone,
   initialChoice,
   isSorted,
@@ -88,6 +89,42 @@ describe('photos à supprimer', () => {
     const marks = new Map<string, Mark>([['Photos/plage - Copie.jpg', 'remove']]);
     const noGroups: Group[] = [];
     expect(pendingRemoval(noGroups, photos, marks).remove).toEqual([]);
+  });
+});
+
+describe('toutes les copies exactes d’un coup', () => {
+  it('on garde l’originale de chaque photo, sans rien trier', () => {
+    const { photos, groups } = setup();
+    const p = exactCleanup(groups, photos, new Map());
+    expect(names(photos, p.remove)).toEqual(['IMG-1.jpg', 'chat (1).jpg', 'plage - Copie.jpg']);
+    expect(p.keep).toBe(2);
+    expect(p.bytes).toBe(5_000_000);
+    expect(p.noneKept).toBe(0);
+    expect(p.plans.every((x) => x.group.kind === 'exact' && x.keep.length === 1)).toBe(true);
+  });
+
+  it('un groupe déjà trié à la main garde ses choix', () => {
+    const { photos, groups, plage } = setup();
+    const p = exactCleanup(groups, photos, marksOf(allAs(plage, photos, 'keep')));
+    expect(names(photos, p.remove)).toEqual(['chat (1).jpg']);
+  });
+
+  it('copies exactes au milieu d’un groupe quasi identique : seules les copies partent', () => {
+    const p = (path: string, sha: string | undefined, width: number): PhotoInfo => ({ key: path, path, name: path, size: 10, lastModified: 1, sha, width, height: width, dhash: '5a3c96e1f00f33cc' });
+    const photos = [p('a.jpg', 's', 800), p('a (1).jpg', 's', 800), p('grande.jpg', undefined, 4000)];
+    const groups = buildGroups(photos, findPairs(photos), DEFAULTS);
+    expect(groups).toHaveLength(1);
+    expect(photos[groups[0].best].path).toBe('grande.jpg');
+    const out = exactCleanup(groups, photos, new Map());
+    expect(names(photos, out.remove)).toEqual(['a (1).jpg']);
+    expect(names(photos, out.plans[0].keep)).toEqual(['a.jpg']);
+  });
+
+  it('la suggestion du groupe est gardée si elle est l’une des copies', () => {
+    const { photos, plage } = setup();
+    const p = exactCleanup([plage], photos, new Map());
+    expect(p.plans[0].keep).toEqual([plage.best]);
+    expect(p.remove).not.toContain(plage.best);
   });
 });
 

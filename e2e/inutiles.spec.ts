@@ -11,23 +11,23 @@ import { PHOTOS_DIR } from './photos';
 
 const SHOTS = join(import.meta.dirname, '..', 'test-results');
 
-async function analyze(page: Page, junkModel = false) {
+async function analyze(page: Page, junkModel = false, open = true) {
   await page.goto('/');
   await page.getByRole('checkbox', { name: /photos similaires/ }).uncheck();
   const box = page.getByRole('checkbox', { name: /documents, tickets et mèmes/ });
   if (junkModel) await box.check();
   else await box.uncheck();
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
-  await expect(page.getByText('photos analysées')).toBeVisible({ timeout: junkModel ? 200_000 : 30_000 });
-  await page.getByRole('tab', { name: /Inutiles/ }).click();
+  await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: junkModel ? 200_000 : 30_000 });
+  if (open) await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
 }
 
 const sorter = (page: Page) => page.getByRole('dialog', { name: 'Trier les photos inutiles' });
 
-test('onglet « Inutiles » : raisons, photos noires regroupées, réglages', async ({ page }, info) => {
+test('page des photos inutiles : raisons, photos noires regroupées, réglages', async ({ page }, info) => {
   await analyze(page);
   const groups = page.getByTestId('group');
-  await expect(page.getByRole('tab', { name: /Inutiles/ })).toContainText('6');
+  await expect(page.getByRole('tab')).toHaveCount(0);
   await expect(groups).toHaveCount(6);
   await expect(page.locator('.tile', { hasText: 'photos inutiles' }).locator('strong')).toHaveText('7');
   // Le plus gros groupe d'abord : les deux photos noires, ensemble.
@@ -48,27 +48,35 @@ test('onglet « Inutiles » : raisons, photos noires regroupées, réglages', as
   await page.getByRole('checkbox', { name: 'Floue' }).check();
   await expect(groups).toHaveCount(6);
   // Les doublons, eux, n'ont pas changé.
-  await page.getByRole('tab', { name: /Tous/ }).click();
+  await page.locator('.fn-switch').getByRole('button', { name: /Doublons/ }).click();
   await expect(groups).toHaveCount(2);
 });
 
-test('swipe : je jette, je garde (bouton, clavier, geste), puis le récapitulatif', async ({ page }, info) => {
+test('swipe : une photo à la fois (bouton, clavier, geste), sans résumé à la fin', async ({ page }, info) => {
   await analyze(page);
   await page.getByRole('button', { name: 'Trier les photos inutiles' }).click();
   const s = sorter(page);
   await s.getByRole('button', { name: 'Swipe' }).click();
-  await expect(s.getByText('Groupe 1 sur 6')).toBeVisible();
-  // Un groupe entier sur une carte : les deux photos noires.
-  await expect(s.getByText('2 photos semblables')).toBeVisible();
+  // Les deux photos noires, l'une après l'autre (plus de carte pour tout le groupe).
+  await expect(s.getByText('Photo 1 sur 7')).toBeVisible();
+  await expect(s.getByText('noire-1.jpg')).toBeVisible();
   await expect(s.locator('.reasons-line')).toHaveText('Presque vide');
   await page.screenshot({ path: join(SHOTS, `swipe-${info.project.name}.png`) });
   await s.getByRole('button', { name: '✕ Je jette' }).click();
-  // Groupe 2 : la photo floue, gardée au clavier.
-  await expect(s.getByText('Groupe 2 sur 6')).toBeVisible();
+  await expect(s.getByText('Photo 2 sur 7')).toBeVisible();
+  await expect(s.getByText('noire-2.jpg')).toBeVisible();
+  // Retour en arrière : le choix est montré, et se change.
+  await s.getByRole('button', { name: 'Précédent' }).click();
+  await expect(s.locator('.mark.remove')).toBeVisible();
+  await s.getByRole('button', { name: '✕ Je jette' }).click();
+  await expect(s.getByText('Photo 2 sur 7')).toBeVisible();
+  await s.getByRole('button', { name: '✕ Je jette' }).click();
+  // La photo floue, gardée au clavier.
+  await expect(s.getByText('Photo 3 sur 7')).toBeVisible();
   await expect(s.getByText('floue.jpg')).toBeVisible();
   await page.keyboard.press('ArrowRight');
-  // Groupe 3 : la photo sombre, jetée d'un geste vers la gauche.
-  await expect(s.getByText('Groupe 3 sur 6')).toBeVisible();
+  // La photo sombre, jetée d'un geste vers la gauche.
+  await expect(s.getByText('Photo 4 sur 7')).toBeVisible();
   await expect(s.getByText('sombre.jpg')).toBeVisible();
   const card = (await s.getByTestId('swipe-card').boundingBox())!;
   const y = card.y + card.height / 2;
@@ -78,21 +86,52 @@ test('swipe : je jette, je garde (bouton, clavier, geste), puis le récapitulati
   await expect(s.locator('.stamp.remove')).not.toHaveCSS('opacity', '0');
   await page.mouse.move(card.x + card.width / 2 - 220, y, { steps: 4 });
   await page.mouse.up();
-  await expect(s.getByText('Groupe 4 sur 6')).toBeVisible();
+  await expect(s.getByText('Photo 5 sur 7')).toBeVisible();
   // Un geste trop court ne décide rien.
-  const card4 = (await s.getByTestId('swipe-card').boundingBox())!;
-  await page.mouse.move(card4.x + card4.width / 2, y);
+  const card5 = (await s.getByTestId('swipe-card').boundingBox())!;
+  await page.mouse.move(card5.x + card5.width / 2, y);
   await page.mouse.down();
-  await page.mouse.move(card4.x + card4.width / 2 + 40, y, { steps: 3 });
+  await page.mouse.move(card5.x + card5.width / 2 + 40, y, { steps: 3 });
   await page.mouse.up();
-  await expect(s.getByText('Groupe 4 sur 6')).toBeVisible();
+  await expect(s.getByText('Photo 5 sur 7')).toBeVisible();
 
+  // Fermer en cours de route : les photos jetées comptent déjà, sans finir leur groupe.
   await s.getByRole('button', { name: 'Retour aux groupes' }).click();
-  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 3 groupes sur 6');
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 4 photos sur 7');
   await page.getByRole('button', { name: /Supprimer 3 photos/ }).click();
   const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
   await expect(modal.getByTestId('remove-summary')).toContainText('3 photos à supprimer');
-  await expect(modal.getByText('Attention : dans 2 groupes, tu ne gardes aucune photo.')).toBeVisible();
+  await expect(modal.getByText(/tu ne gardes aucune photo/)).toHaveCount(0);
+  await modal.getByRole('button', { name: 'Fermer' }).click();
+
+  // Reprise où on en était ; après la dernière photo, retour direct à la liste.
+  await page.getByRole('button', { name: 'Continuer le tri' }).click();
+  await expect(s.getByText('Photo 5 sur 7')).toBeVisible();
+  for (let n = 5; n <= 7; n++) {
+    await expect(s.getByText(`Photo ${n} sur 7`)).toBeVisible();
+    await page.keyboard.press('ArrowRight');
+  }
+  await expect(s).toBeHidden();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 7 photos sur 7');
+  // Les doublons n'ont pas bougé : chaque fonction a ses choix.
+  await page.locator('.fn-switch').getByRole('button', { name: /Doublons/ }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
+  await page.screenshot({ path: join(SHOTS, `resultats-inutiles-${info.project.name}.png`), fullPage: true });
+  // « Revoir le tri » : toutes les photos défilent de nouveau.
+  await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
+  await page.getByRole('button', { name: 'Revoir le tri' }).click();
+  await expect(s.getByText('Photo 1 sur 7')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(s.getByText('Photo 2 sur 7')).toBeVisible();
+});
+
+test('« Pas inutiles » : ces photos ne sont plus proposées ; se remettent', async ({ page }) => {
+  await analyze(page);
+  await page.getByTestId('group').filter({ hasText: 'floue.jpg' }).getByRole('button', { name: 'Pas inutiles' }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 0 photo sur 6');
+  await page.getByText('Groupes mis de côté (1)').click();
+  await page.getByRole('button', { name: 'Remettre dans la liste' }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 0 photo sur 7');
 });
 
 test('grille des photos inutiles : tout à jeter par défaut, plein écran', async ({ page }) => {
@@ -141,16 +180,63 @@ test.describe('modèle des photos inutiles (téléchargé : E2E_MODELE=1)', () =
   test.setTimeout(300_000);
 
   test('la page de texte est un document ; les photos noires, prises par erreur', async ({ page }) => {
-    await analyze(page, true);
+    await analyze(page, true, false);
     await expect(page.getByText(/Photos inutiles reconnues par (la carte graphique|le processeur)/)).toBeVisible();
+    await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
     await expect(page.getByTestId('group').filter({ hasText: 'page.jpg' })).toContainText('Document');
     await expect(page.getByTestId('group').filter({ hasText: 'noire-1.jpg' })).toContainText('Prise par erreur');
   });
 
+  test('deuxième analyse : modèle déjà là, ni téléchargé ni rechargé', async ({ page }) => {
+    await analyze(page, true, false);
+    // Relancer ne recharge aucun modèle (rien de nouveau à reconnaître), mais garde ce qu'il avait reconnu.
+    const workers: string[] = [];
+    page.on('worker', (w) => workers.push(w.url()));
+    await page.getByRole('button', { name: 'Autre dossier' }).click();
+    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 30_000 });
+    expect(workers.filter((u) => /clip|embed/.test(u))).toEqual([]);
+    await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
+    await expect(page.getByTestId('group').filter({ hasText: 'page.jpg' })).toContainText('Document');
+
+    // Une photo à reconnaître : le modèle est relu du disque, l'écran ne parle pas de téléchargement.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const open = indexedDB.open('twin-pics');
+          open.onsuccess = () => {
+            const tx = open.result.transaction('photos', 'readwrite');
+            const all = tx.objectStore('photos').openCursor();
+            all.onsuccess = () => {
+              const c = all.result;
+              if (!c) return;
+              c.update({ ...c.value, clipModel: 'ancien' });
+              c.continue();
+            };
+            tx.oncomplete = () => {
+              open.result.close();
+              resolve();
+            };
+          };
+        }),
+    );
+    await page.evaluate(() => {
+      (window as unknown as { seen: string }).seen = '';
+      new MutationObserver(() => ((window as unknown as { seen: string }).seen += document.querySelector('.scan h2')?.textContent ?? '')).observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+    await page.getByRole('button', { name: 'Autre dossier' }).click();
+    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 120_000 });
+    const seen = await page.evaluate(() => (window as unknown as { seen: string }).seen);
+    expect(seen).toContain('Préparation du modèle');
+    expect(seen).not.toContain('Téléchargement');
+  });
+
   test('sur le processeur (version fp32), même résultat', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('model-device', 'wasm'));
-    await analyze(page, true);
+    await analyze(page, true, false);
     await expect(page.getByText('Photos inutiles reconnues par le processeur, plus lent.')).toBeVisible();
+    await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
     await expect(page.getByTestId('group').filter({ hasText: 'page.jpg' })).toContainText('Document');
   });
 });

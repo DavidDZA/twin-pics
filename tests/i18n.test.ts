@@ -30,8 +30,13 @@ describe('traduction', () => {
 
   it.each(LANGS.filter((l) => l !== 'fr'))('%s : aucun texte resté en français', (lang) => {
     const dict = walk(DICTS[lang]);
-    // Mots qui s'écrivent vraiment pareil : « Suggestion », « 1 photo », « Duels », « Swipe » et « Document » en anglais, « l’originale » en italien.
-    const sameForReal = new Set(['en:group.suggestion', 'en:group.photos', 'en:sort.duels', 'en:sort.swipe', 'en:junk.reasons.document', 'it:group.reasons.original']);
+    // Mots qui s'écrivent vraiment pareil : « Suggestion », « 1 photo », « Duels », « Swipe » et « Document » en anglais, « l’originale » en italien, « Zoom » partout.
+    const sameForReal = new Set([
+      'en:stats.families.duel',
+      'en:stats.names.champion',
+      'de:stats.families.scan',
+      'de:stats.names.diamond',
+'en:group.suggestion', 'en:group.photos', 'en:sort.duels', 'en:sort.swipe', 'en:junk.reasons.document', 'it:group.reasons.original', ...['en', 'es', 'de', 'it', 'pt'].map((l) => `${l}:viewer.zoom`)]);
     const same = [...dict].filter(([key, texts]) => texts[0] === fr.get(key)![0] && /[a-zà-ÿ]{4,}/i.test(texts[0]) && !sameForReal.has(`${lang}:${key}`));
     expect(same.map(([k]) => k)).toEqual([]);
   });

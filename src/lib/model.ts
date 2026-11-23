@@ -14,5 +14,18 @@ export const embedId = (dtype: string) => `${EMBED_MODEL}@${dtype}`;
 /** Le plus gros téléchargement possible (version carte graphique), annoncé avant l'analyse (Mo). */
 export const EMBED_SIZE_MB = 45;
 
+/**
+ * Le fichier du modèle est-il déjà sur l'appareil (Cache Storage, rempli par Transformers.js) ? Sinon il va être
+ * téléchargé : la progression ne dit « Téléchargement » que dans ce cas.
+ */
+export async function modelCached(repo: string, file: string): Promise<boolean> {
+  try {
+    const cache = await caches.open('transformers-cache');
+    return (await cache.keys()).some((r) => r.url.includes(`/${repo}/`) && r.url.endsWith(`/${file}`));
+  } catch {
+    return false;
+  }
+}
+
 /** localStorage : « wasm » force le processeur (tests, dépannage d'une carte graphique capricieuse). */
 export const DEVICE_KEY = 'model-device';

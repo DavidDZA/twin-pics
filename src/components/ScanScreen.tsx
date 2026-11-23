@@ -9,6 +9,7 @@ const LABELS: Record<Shown['phase'], string> = {
   listing: T.scan.listing,
   analyze: T.scan.analyze,
   model: T.scan.model,
+  loading: T.scan.loading,
   similar: T.scan.similar,
   pairs: T.scan.pairs,
 };
@@ -27,7 +28,7 @@ export function ScanScreen({ progress, onStop }: { progress: Shown; onStop: () =
     if (rate > 0 && elapsed > 2) remaining = T.scan.remaining(duration((total - done) / rate));
   }
   const count =
-    phase === 'model' ? (total ? `${bytes(done)} / ${bytes(total)}` : '') : phase === 'listing' ? num(done) : phase === 'pairs' ? '' : `${num(done)} / ${num(total)}`;
+    phase === 'model' ? (total ? `${bytes(done)} / ${bytes(total)}` : '') : phase === 'listing' ? num(done) : phase === 'pairs' || phase === 'loading' ? '' : `${num(done)} / ${num(total)}`;
 
   return (
     <section className="scan" aria-live="polite">

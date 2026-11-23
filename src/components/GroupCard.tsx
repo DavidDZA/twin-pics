@@ -3,7 +3,6 @@ import { T, bytes, dateTime } from '../i18n';
 import type { Group, PhotoInfo } from '../lib/groups';
 import { folderOf } from '../lib/filetypes';
 import { shortPath } from '../lib/display';
-import type { Verdict } from '../lib/db';
 import type { Mark } from '../lib/choices';
 import { likenessText, reasonsText } from './photoText';
 import { useThumbs } from './useThumbs';
@@ -11,15 +10,17 @@ import { useThumbs } from './useThumbs';
 interface Props {
   group: Group;
   photos: PhotoInfo[];
-  verdict?: Verdict;
   /** Le tri de chaque photo du groupe (clé → garder / supprimer), s'il est fait. */
   marks?: (Mark | undefined)[];
-  onVerdict: (v: Verdict | null) => void;
   onOpen: (index: number) => void;
   onSort: () => void;
+  /** « Pas des doublons », « Pas inutiles » : le groupe n'est plus proposé. */
+  onIgnore: () => void;
+  /** Groupe mis de côté : seulement « Remettre ». */
+  onRestore?: () => void;
 }
 
-export const GroupCard = memo(function GroupCard({ group, photos, verdict, marks, onVerdict, onOpen, onSort }: Props) {
+export const GroupCard = memo(function GroupCard({ group, photos, marks, onOpen, onSort, onIgnore, onRestore }: Props) {
   const thumbs = useThumbs(group.members.map((i) => photos[i].key));
   const first = photos[group.members[0]];
   const sorted = !!marks && marks.every(Boolean);
@@ -38,7 +39,7 @@ export const GroupCard = memo(function GroupCard({ group, photos, verdict, marks
         {group.members.map((i, n) => {
           const p = photos[i];
           const like = likenessText(photos, group, i);
-          const mark = sorted ? marks![n] : undefined;
+          const mark = sorted || group.junk ? marks?.[n] : undefined;
           return (
             <li key={p.key} className={[i === group.best ? 'best' : '', mark ?? ''].join(' ').trim() || undefined}>
               <button className="thumb" onClick={() => onOpen(n)} aria-label={p.name}>
@@ -68,17 +69,21 @@ export const GroupCard = memo(function GroupCard({ group, photos, verdict, marks
         })}
       </ul>
       <footer>
-        <button className={sorted ? 'secondary' : 'primary'} onClick={onSort}>
-          {sorted ? T.sort.edit : T.sort.sortThis}
-        </button>
-        <span className="spacer" />
-        <span className="muted">{T.group.verdict}</span>
-        <button className={verdict === 'good' ? 'toggle on good' : 'toggle'} aria-pressed={verdict === 'good'} onClick={() => onVerdict(verdict === 'good' ? null : 'good')}>
-          {T.group.good}
-        </button>
-        <button className={verdict === 'wrong' ? 'toggle on wrong' : 'toggle'} aria-pressed={verdict === 'wrong'} onClick={() => onVerdict(verdict === 'wrong' ? null : 'wrong')}>
-          {group.junk ? T.group.wrongJunk : T.group.wrong}
-        </button>
+        {onRestore ? (
+          <button className="secondary" onClick={onRestore}>
+            {T.ignored.restore}
+          </button>
+        ) : (
+          <>
+            <button className={sorted ? 'secondary' : 'primary'} onClick={onSort}>
+              {sorted ? T.sort.edit : T.sort.sortThis}
+            </button>
+            <span className="spacer" />
+            <button className="secondary" onClick={onIgnore} title={group.junk ? T.ignored.helpJunk : T.ignored.help}>
+              {group.junk ? T.group.wrongJunk : T.group.wrong}
+            </button>
+          </>
+        )}
       </footer>
     </article>
   );

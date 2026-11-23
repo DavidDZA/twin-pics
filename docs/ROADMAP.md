@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 23/11/2026. Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 23/11/2026 (version 0.7). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -29,23 +29,28 @@
 > limite de temps, mode **swipe** (je garde / je jette) ; seuils calibrés sur 1 493 photos de l'utilisateur. La
 > première analyse en 0.4 relit une fois toutes les photos (nouvelles mesures, et MobileCLIP).
 >
-> (23/11) L'utilisateur essaiera l'exe 0.4 plus tard ; rien de nouveau à coder en attendant. À sa demande, chaque
-> version est aussi construite dans le dossier `release/` du projet (`release/Twin Pics 0.4.0.exe`).
+> (23/11) **Essai de la 0.4 par l'utilisateur** (850 photos en 1 min 30) : modèle « retéléchargé » à chaque fois, appli
+> lente à s'ouvrir, swipe à faire image par image et sans résumé, un cas bizarre (photos noires en double d'une photo de
+> mer), fonctions à séparer, choix à pouvoir effacer, « Bien trouvé » / « Pas des doublons » sans effet, zoom manquant.
+> Les erreurs des photos inutiles ne sont « pas graves pour l'instant ».
 >
-> **Reprendre ici** : retour de l'utilisateur sur l'exe 0.4 (`release/Twin Pics 0.4.0.exe`, ou dans les *Releases*,
-> l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Lui demander :
+> (23/11) **Version 0.5**, en réponse : doublons et photos inutiles séparés (ARCHITECTURE § 1), swipe photo par photo
+> (§ 4.3), « Pas des doublons » met vraiment le groupe de côté et « Effacer mes choix » (§ 4.4), zoom (§ 4.5), stats et
+> badges (§ 4.6), toutes les copies exactes en un bouton (§ 4.2), photos noires hors des doublons (§ 3.3), modèles ni
+> rechargés ni annoncés « téléchargés » à tort (§ 3), installateur (§ 2.1 : 36 s d'ouverture pour l'exe portable).
 >
-> - les **durées** : la première analyse en 0.4 relit tout (≈ 15 min pour 10 000 photos sur disque dur, plus les deux
->   modèles) ; la vitesse de MobileCLIP sur 10 000 photos n'est pas encore mesurée (§ 6.1) ; ligne « reconnues par
->   la carte graphique / le processeur » ;
-> - l'onglet **Inutiles** : combien de photos proposées, les erreurs (« Pas inutiles ») et les oubliées, les
->   raisons à décocher, les curseurs touchés (seuils par défaut à revoir : ARCHITECTURE § 4.3) ;
-> - le **swipe** (geste, clavier, groupes en mosaïque) et la **grille** sur un grand groupe ;
-> - les **doublons** : les photos noires ne sont plus « similaires » (elles vont dans les inutiles) ;
-> - la **suppression** : Corbeille ou dossier « À supprimer », annulation.
+> (23/11) Essai de la 0.5 : **« tout est nickel »**. Demandes : une barre au démarrage, passer des doublons aux inutiles en
+> un clic, 50 badges ; installateur pas compris (« il installe où ? »). **Version 0.6** : barre d'ouverture et portable
+> rapide (0,4 s dès le deuxième lancement), installateur avec assistant, « Doublons | Photos inutiles », 50 badges
+> (ARCHITECTURE § 1, § 2.1, § 4.6).
 >
-> Ensuite : § 3 (ménage des copies exactes en un bouton…), § 5.3 (appli Android) ou § 6.1 (WhatsApp par
-> conversation).
+> (23/11) Essai de la 0.6 : « ça s'ouvre ultra vite ». **Version 0.7** : une seule page (plus de choix doublons / inutiles
+> ni de « Retour » ; « Relancer », « Autre dossier » et « Effacer tous mes choix… » en haut), plus d'installateur.
+>
+> **Reprendre ici** : l'utilisateur choisit la suite. Proposé : d'abord un vrai ménage de ses photos (seule
+> l'utilisation montrera les manques), puis l'**appli Android** (§ 5.3, **rien commencer sans son feu vert**). Petits plus
+> possibles avant, sur PC : plusieurs dossiers à la fois, astuces de première visite et annonce des nouvelles versions
+> (§ 3), vidéos en double (§ 6).
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -66,19 +71,27 @@
   duel choisit la meilleure, garder plusieurs ou aucune se fait dans le résumé du groupe) ; suppression **à la fin, en
   une fois** (pas après chaque groupe).
 
+### 1.2 Décisions du 23/11/2026
+
+- **Ni Mac, ni iPhone / iPad** : pas de version, pas d'effort particulier (PhotoKit, signature Apple…).
+- **WhatsApp seulement sur Android** (pas sous Windows, où les images n'indiquent pas leur conversation).
+- **Deux fonctions séparées** : doublons, photos inutiles ; une seule page, un clic pour passer de l'une à l'autre.
+- **Plus d'installateur** : seulement l'exe portable.
+- Android : ne rien commencer pour l'instant.
+
 ## 2. Mesurer la détection sur les vraies photos (prochaine étape)
 
 1. Lancer l'analyse sur un vrai dossier ; noter le nombre de photos et la durée de chaque étape (analyse, modèle).
-2. Parcourir les groupes, répondre « Bien trouvé » / « Pas des doublons », jouer avec les curseurs.
-3. Choisir les seuils par défaut à partir des réponses (comme les propositions de Rank It All : test hors ligne sur
-   les vraies données). Il faudra un **export des réponses** (labels + scores des paires) pour le faire hors de l'appli.
+2. Parcourir les groupes, marquer « Pas des doublons » les erreurs, jouer avec les curseurs.
+3. Choisir les seuils par défaut à partir des groupes mis de côté (comme les propositions de Rank It All : test hors
+   ligne sur les vraies données). Il faudra un **export** (groupes mis de côté + scores des paires).
 4. Groupes manqués : ajouter un moyen de dire « ces deux photos sont des doublons » (aujourd'hui, seules les erreurs
    des groupes trouvés se voient).
-5. Photos inutiles (0.4) : même démarche — réponses « Bien trouvé » / « Pas inutiles », mesures de qualité et scores
-   MobileCLIP exportés, pour revoir `blurMax`, `clipMin` et `groupMin` (calibrage de départ : ARCHITECTURE § 4.3).
+5. Photos inutiles : même démarche — « Pas inutiles », « Je garde », mesures de qualité et scores MobileCLIP exportés, pour
+   revoir `blurMax`, `clipMin` et `groupMin` (calibrage de départ : ARCHITECTURE § 4.3).
 
-Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « similaire » veut dire pour l'utilisateur
-(rafales, même scène à quelques minutes, copies retouchées).
+Questions encore ouvertes : nombre de photos ; vidéos ; ce que « similaire » veut dire pour l'utilisateur (rafales, même
+scène à quelques minutes, copies retouchées).
 
 ## 3. Appli PC utilisable
 
@@ -86,15 +99,16 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 - ~~**Supprimer sans risque** : Corbeille de Windows ou dossier « À supprimer », récapitulatif, annulation~~ — fait le
   22/11 (0.3), dans l'appli PC seulement. Annulation : seulement pour le dossier « À supprimer », juste après (la
   Corbeille se vide ou se restaure depuis Windows).
-- **Ménage des copies exactes** en un bouton : marquer tous les groupes « copies exactes » non triés avec la
-  suggestion seule (l'originale), puis la fenêtre « Avant de supprimer ».
+- ~~**Ménage des copies exactes** en un bouton~~ — fait le 23/11 (0.5).
 - Site : supprimer aussi (dossier « À supprimer » par la File System Access API en écriture) ? Pas utile tant que le
   site ne sert qu'aux essais.
-- Exe : signature de code (évite l'avertissement de Windows, payante) ; mise à jour automatique (electron-updater et
-  les *Releases*) ; installateur plutôt que portable si l'utilisateur le préfère.
-- HEIC dans l'appli PC : décodage par le processus principal (sharp / libheif) au lieu du navigateur.
-- Groupes « pas des doublons » qui ne reviennent plus.
-- Stats et badges (place libérée, photos triées), astuces de première visite (comme Rank It All).
+- **Plusieurs dossiers à la fois** (deux disques, ou le PC et une clé).
+- Exe : signature de code (évite l'avertissement de Windows, payante) ; annonce d'une nouvelle version (un exe portable ne se met pas à jour tout
+  seul : prévenir et ouvrir la page des *Releases*). ~~Installateur~~ — fait en 0.5, retiré en 0.7.
+- HEIC (certains téléphones Android aussi) dans l'appli PC : décodage par le processus principal (sharp / libheif), si
+  l'utilisateur en a.
+- ~~Groupes « pas des doublons » qui ne reviennent plus ; stats et badges~~ — fait le 23/11 (0.5). Reste : astuces de
+  première visite (comme Rank It All).
 - PWA (installable, hors ligne).
 
 ## 4. Performances (à mesurer d'abord)
@@ -107,7 +121,6 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
   worker).
 - Décodage (110 ms par photo de 12 Mpx) : décoder directement à taille réduite (−20 %) quand les dimensions sont
   connues (EXIF) ; la miniature EXIF intégrée pourrait servir au tri préalable.
-- HEIC (iPhone) : décodeur WebAssembly (libheif) si l'utilisateur en a.
 
 ## 5. Autres sources de photos
 
@@ -116,7 +129,7 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
    publique ; jusqu'à 100 testeurs déclarés sans.
 2. **Google Photos** : l'API ne donne plus la bibliothèque depuis le 31/03/2025 ; passer par les copies du téléphone,
    ou un export **Google Takeout** sur le PC (que le prototype sait déjà lire comme un dossier).
-3. **Android** (décidé le 22/11 : **Capacitor**) : la même interface (React) dans une WebView, avec un module natif
+3. **Android** (décidé le 22/11 : **Capacitor** ; rien à commencer avant le feu vert de l'utilisateur) : la même interface (React) dans une WebView, avec un module natif
    (Kotlin) pour la galerie :
    - liste des photos par **MediaStore** (`READ_MEDIA_IMAGES`, Android 13+ ; accès partiel « photos choisies » à
      gérer), lecture des fichiers par un chemin servi à la WebView (comme `app://` sur PC) ;
@@ -130,7 +143,6 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
      Console dès les premiers essais (comme Rank It All), déclaration de la permission photos (fonction principale :
      autorisée), test fermé de 14 jours avant la production. Compilation par GitHub Actions (rien à installer sur le
      PC), comme l'AAB de Rank It All.
-4. iPhone (PhotoKit), plus tard.
 
 ## 6. Plus tard
 
@@ -140,10 +152,9 @@ Questions encore ouvertes : nombre de photos ; vidéos ; iPhone ; ce que « simi
 Restent :
 
 - **WhatsApp par conversation ou groupe** (demandé le 22/11, « on verra plus tard ») : filtrer les images reçues par
-  conversation, et marquer une conversation « normale » ou « poubelle » (tout ce qui en vient est proposé). Sur PC, les
-  images WhatsApp n'indiquent pas la conversation (dossier unique `WhatsApp Images`) : il faudra l'export de
-  conversation, ou le téléphone (Android : dossiers par conversation dans certaines versions, à vérifier).
-- Apprendre des choix de l'utilisateur (« Bien trouvé » / « Pas inutiles », tri) pour ajuster les seuils, voire un
+  conversation, et marquer une conversation « normale » ou « poubelle » (tout ce qui en vient est proposé). **Sur Android
+  seulement** (décision du 23/11) : dossiers par conversation dans certaines versions, à vérifier.
+- Apprendre des choix de l'utilisateur (« Pas inutiles », « Je garde ») pour ajuster les seuils, voire un
   petit classifieur sur les vecteurs MobileCLIP.
 - Mesurer la vitesse de MobileCLIP sur 10 000 photos (carte graphique, processeur) et le regroupement au-delà de
   4 000 photos inutiles.

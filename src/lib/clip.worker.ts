@@ -9,6 +9,7 @@
  */
 import { AutoProcessor, CLIPVisionModelWithProjection, env, RawImage, type PreTrainedModel, type Processor } from '@huggingface/transformers';
 import { CLIP_MODEL } from './junk';
+import { modelCached } from './model';
 import type { EmbedMessage, EmbedRequest, ModelDevice } from './messages';
 
 env.allowLocalModels = false;
@@ -32,6 +33,7 @@ async function gpuWithF16(): Promise<boolean> {
 }
 
 async function create(device: ModelDevice, dtype: 'fp16' | 'fp32'): Promise<void> {
+  const cached = await modelCached(CLIP_MODEL, dtype === 'fp16' ? 'vision_model_fp16.onnx' : 'vision_model.onnx');
   const files = new Map<string, { loaded: number; total: number }>();
   const progress_callback = (e: { status: string; file?: string; loaded?: number; total?: number }) => {
     if (e.status !== 'progress' || !e.file) return;
@@ -42,7 +44,7 @@ async function create(device: ModelDevice, dtype: 'fp16' | 'fp32'): Promise<void
       loaded += f.loaded;
       total += f.total;
     }
-    post({ type: 'progress', loaded, total });
+    post({ type: 'progress', loaded, total, cached });
   };
   processor = await AutoProcessor.from_pretrained(CLIP_MODEL, { progress_callback });
   model = await CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL, { device, dtype, progress_callback });

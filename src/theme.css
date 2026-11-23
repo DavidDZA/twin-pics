@@ -133,18 +133,14 @@ button.link {
 }
 
 .tile:nth-child(1)::before {
-  content: '📸' / '';
-}
-
-.tile:nth-child(2)::before {
   content: '👯' / '';
 }
 
-.tile:nth-child(3)::before {
+.tile:nth-child(2)::before {
   content: '🗂️' / '';
 }
 
-.tile:nth-child(4)::before {
+.tile:nth-child(3)::before {
   content: '💾' / '';
 }
 
@@ -524,11 +520,9 @@ input[type='range'] {
 @keyframes pop-soft {
   from {
     opacity: 0.3;
-    transform: scale(0.98);
   }
   to {
     opacity: 1;
-    transform: scale(1);
   }
 }
 
@@ -602,8 +596,9 @@ input[type='range'] {
     max-width: none;
   }
 
+  /* Cases trop étroites au téléphone : pas d'emoji sur le chiffre. */
   .tile::before {
-    font-size: 1.2rem;
+    display: none;
   }
 
   .duel-photos .vs {

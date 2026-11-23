@@ -74,6 +74,19 @@ describe('quasi identiques', () => {
     expect(findPairs(black)).toHaveLength(0);
   });
 
+  it('photo noire au bruit trompeur (empreinte proche d’un ciel bleu) : écartée par son contraste', () => {
+    const quality = (contrast: number) => ({ sharp: 500, lum: contrast < 10 ? 1 : 90, dark: 0, bright: 0, contrast });
+    const sky = photo({ path: 'Croatie/mer.jpg', dhash: HASH, quality: quality(49), time: 0, emb: vec(0) });
+    const black = [1, 2, 3].map((k) => photo({ path: `Cuba/noire-${k}.jpg`, dhash: flip(HASH, 5 + k), quality: quality(1), time: k * 1000, emb: vec(1) }));
+    const photos = [sky, ...black];
+    expect(findPairs(photos)).toHaveLength(0);
+    // Le même fichier deux fois reste une copie exacte.
+    const twice = [{ ...black[0], sha: 'n' }, photo({ path: 'Cuba/noire - Copie.jpg', dhash: HASH, quality: quality(1), sha: 'n' })];
+    expect(group(twice).map((g) => g.kind)).toEqual(['exact']);
+    // Un vrai ciel, lui, garde ses doublons.
+    expect(group([sky, photo({ path: 'b.jpg', dhash: flip(HASH, 3), quality: quality(48) })])).toHaveLength(1);
+  });
+
   it('copies exactes et quasi identiques ensemble : groupe « quasi identiques »', () => {
     const photos = [photo({ path: 'a.jpg', sha: 's', dhash: HASH }), photo({ path: 'b.jpg', sha: 's', dhash: HASH }), photo({ path: 'c.jpg', dhash: flip(HASH, 3) })];
     const groups = group(photos);

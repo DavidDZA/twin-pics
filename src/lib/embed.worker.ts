@@ -7,7 +7,7 @@
  * photos, elles, ne quittent jamais l'ordinateur : le worker reçoit leurs pixels, réduits par `analyze.worker.ts`.
  */
 import { env, pipeline, RawImage, type ImageFeatureExtractionPipeline } from '@huggingface/transformers';
-import { EMBED_MODEL } from './model';
+import { EMBED_MODEL, modelCached } from './model';
 import type { EmbedMessage, EmbedRequest, ModelDevice } from './messages';
 
 env.allowLocalModels = false;
@@ -31,6 +31,7 @@ async function gpuWithF16(): Promise<boolean> {
 }
 
 async function create(device: ModelDevice, dtype: string): Promise<ImageFeatureExtractionPipeline> {
+  const cached = await modelCached(EMBED_MODEL, dtype === 'fp16' ? 'model_fp16.onnx' : 'model_quantized.onnx');
   const files = new Map<string, { loaded: number; total: number }>();
   const p = (await pipeline('image-feature-extraction', EMBED_MODEL, {
     device,
@@ -44,7 +45,7 @@ async function create(device: ModelDevice, dtype: string): Promise<ImageFeatureE
         loaded += f.loaded;
         total += f.total;
       }
-      post({ type: 'progress', loaded, total });
+      post({ type: 'progress', loaded, total, cached });
     },
   })) as ImageFeatureExtractionPipeline;
   // Premier passage à vide : sur la carte graphique, il prépare les calculs (quelques secondes, une fois).

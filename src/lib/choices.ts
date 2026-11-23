@@ -5,11 +5,13 @@
  * - Le tri est retenu photo par photo (table `marks`) : un groupe est **trié** quand toutes ses photos le sont. Si
  *   les réglages changent et qu'un groupe gagne une photo, il redevient « à trier » (ses choix restent proposés).
  * - Seules les photos « à supprimer » d'un groupe trié sont supprimées (`pendingRemoval`) : une photo marquée qui
- *   n'est plus dans aucun groupe (réglages changés) n'est jamais touchée.
+ *   n'est plus dans aucun groupe (réglages changés) n'est jamais touchée. Photos inutiles : chacune se décide seule
+ *   (swipe), pas besoin que tout son groupe soit trié.
+ * - **Copies exactes** (`exactCleanup`) : toutes d'un coup, sans les trier ; on garde l'originale de chaque photo.
  * - **Duels** (téléphone) : la suggestion affronte la photo suivante, la gagnante affronte la suivante, etc. ; à la
  *   fin, on ne garde que la gagnante, modifiable dans le résumé du groupe.
  */
-import type { Group, PhotoInfo } from './groups';
+import { suggestBest, type Group, type PhotoInfo } from './groups';
 
 export type Mark = 'keep' | 'remove';
 
@@ -66,7 +68,7 @@ export interface Pending {
   remove: number[];
   keep: number;
   bytes: number;
-  /** Groupes où aucune photo n'est gardée (« tout supprimer ») : signalés avant de supprimer. */
+  /** Groupes de doublons où aucune photo n'est gardée (« tout supprimer ») : signalés avant de supprimer. */
   noneKept: number;
   /** Groupes triés (avec ou sans photo à supprimer). */
   sorted: number;
@@ -75,8 +77,9 @@ export interface Pending {
 export function pendingRemoval(groups: Group[], photos: PhotoInfo[], marks: ReadonlyMap<string, Mark>): Pending {
   const out: Pending = { plans: [], remove: [], keep: 0, bytes: 0, noneKept: 0, sorted: 0 };
   for (const group of groups) {
-    if (!isSorted(group, photos, marks)) continue;
-    out.sorted++;
+    const sorted = isSorted(group, photos, marks);
+    if (sorted) out.sorted++;
+    else if (!group.junk) continue;
     const keep = group.members.filter((i) => marks.get(photos[i].key) === 'keep');
     const remove = group.members.filter((i) => marks.get(photos[i].key) === 'remove');
     if (!remove.length) continue;
@@ -84,7 +87,34 @@ export function pendingRemoval(groups: Group[], photos: PhotoInfo[], marks: Read
     out.remove.push(...remove);
     out.keep += keep.length;
     for (const i of remove) out.bytes += photos[i].size;
-    if (!keep.length) out.noneKept++;
+    if (!keep.length && !group.junk) out.noneKept++;
+  }
+  return out;
+}
+
+/**
+ * Supprimer toutes les copies exactes d'un coup : dans chaque groupe, les fichiers identiques octet pour octet, sauf
+ * un (la suggestion du groupe si elle en fait partie, sinon l'originale). Des copies déjà triées à la main ne sont
+ * pas concernées : le choix de l'utilisateur reste.
+ */
+export function exactCleanup(groups: Group[], photos: PhotoInfo[], marks: ReadonlyMap<string, Mark>): Pending {
+  const out: Pending = { plans: [], remove: [], keep: 0, bytes: 0, noneKept: 0, sorted: 0 };
+  for (const group of groups) {
+    const bySha = new Map<string, number[]>();
+    for (const i of group.members) {
+      const sha = photos[i].sha;
+      if (sha) bySha.set(sha, [...(bySha.get(sha) ?? []), i]);
+    }
+    for (const copies of bySha.values()) {
+      if (copies.length < 2 || copies.some((i) => marks.has(photos[i].key))) continue;
+      const best = copies.includes(group.best) ? group.best : suggestBest(photos, copies, 'exact').best;
+      const remove = copies.filter((i) => i !== best);
+      const wasted = remove.reduce((s, i) => s + photos[i].size, 0);
+      out.plans.push({ group: { ...group, id: `${group.id}:${best}`, kind: 'exact', members: [best, ...remove], best, reason: 'original', wasted }, keep: [best], remove });
+      out.remove.push(...remove);
+      out.keep++;
+      out.bytes += wasted;
+    }
   }
   return out;
 }

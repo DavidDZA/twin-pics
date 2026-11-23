@@ -6,9 +6,66 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <title>Twin Pics</title>
+    <!-- Barre d'ouverture : affichée dès que la page existe, remplacée par l'appli quand son code est chargé. -->
+    <style>
+      html {
+        background: #f6f7fb;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        font: 700 28px system-ui, 'Segoe UI', sans-serif;
+        color: #1b1d26;
+      }
+      .boot-bar {
+        width: min(320px, 70vw);
+        height: 10px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #e3e6ee;
+      }
+      .boot-bar::after {
+        content: '';
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #4f7cff, #ff8a4c);
+        animation: boot 4s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+      }
+      @keyframes boot {
+        from {
+          width: 8%;
+        }
+        to {
+          width: 94%;
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background: #12131a;
+        }
+        .boot {
+          color: #eceef5;
+        }
+        .boot-bar {
+          background: #262936;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="progressbar" aria-label="Twin Pics">
+        <img src="favicon.svg" alt="" width="72" height="72" />
+        Twin Pics
+        <div class="boot-bar"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

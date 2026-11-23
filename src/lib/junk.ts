@@ -9,11 +9,12 @@
  *    `junkPrompts.json`) ; une catégorie est retenue si sa probabilité dépasse `clipMin`.
  *
  * Les photos inutiles qui se ressemblent forment des **groupes** (MobileCLIP, ou dHash sans le modèle ; toutes les
- * photos presque vides ensemble), **sans limite de temps** : dix captures de la même appli, des tickets, des photos du sol se trient d'un coup. Une photo déjà dans
- * un groupe de doublons n'est pas proposée ici (le tri des doublons s'en occupe).
+ * photos presque vides ensemble), **sans limite de temps** : dix captures de la même appli, des tickets, des photos
+ * du sol sont côte à côte. Les deux fonctions sont séparées (23/11/2026) : une photo inutile est proposée même si elle
+ * est aussi dans un groupe de doublons, et chacune a ses propres choix.
  */
 import type { Group, PhotoInfo } from './groups';
-import { groupId } from './groups';
+import { EMPTY_CONTRAST, groupId } from './groups';
 import { cosine, hamming, isUniformHash } from './imagehash';
 import type { Quality } from './quality';
 
@@ -76,7 +77,6 @@ export const JUNK_LIMITS = { blurMax: [5, 120], clipMin: [0.3, 0.95], groupMin: 
 export const JUNK_DEFAULTS: JunkParams = { blurMax: 30, clipMin: 0.7, groupMin: 0.85, off: [] };
 
 /** Seuils fixes des règles d'exposition (luminosité 0 à 255, parts de pixels). */
-const EMPTY_CONTRAST = 10;
 const DARK_LUM = 35;
 const DARK_SHARE = 0.55;
 const BRIGHT_LUM = 228;
@@ -147,9 +147,9 @@ const NEAR_BITS = 6;
 
 /**
  * Les groupes de photos inutiles. `reasons[i]` : raisons de la photo `i` (vide : pas inutile) ; `exclude` : photos
- * déjà dans un groupe de doublons. Les plus gros groupes d'abord (on en trie beaucoup d'un coup), puis par date.
+ * à laisser de côté (supprimées, ou signalées « Pas inutiles »). Les plus gros groupes d'abord (on en trie beaucoup d'un coup), puis par date.
  */
-export function buildJunkGroups(photos: PhotoInfo[], reasons: JunkReason[][], params: JunkParams, exclude: Set<number>): Group[] {
+export function buildJunkGroups(photos: PhotoInfo[], reasons: JunkReason[][], params: JunkParams, exclude: ReadonlySet<number>): Group[] {
   const idx = photos.map((_, i) => i).filter((i) => reasons[i]?.length && !exclude.has(i));
   const parent = new Map(idx.map((i) => [i, i]));
   const find = (i: number): number => {

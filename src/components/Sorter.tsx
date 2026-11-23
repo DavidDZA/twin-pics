@@ -1,10 +1,12 @@
 /**
- * Le tri, groupe par groupe, en plein écran. Deux façons (bouton « Affichage ») :
+ * Le tri, en plein écran. Photos inutiles : grille, ou swipe photo par photo (`SwipeSorter`). Doublons, groupe par
+ * groupe, deux façons (bouton « Affichage ») :
  * - **Grille** (PC) : tout le groupe à l'écran, la suggestion déjà gardée ; un clic sur une photo la garde ou la
  *   supprime ; touches 1 à 9 et Entrée ;
  * - **Duels** (téléphone) : deux photos à la fois, on touche celle qu'on préfère ; la gagnante affronte la suivante.
  *   À la fin, le résumé du groupe (la grille) permet d'en garder plusieurs, ou aucune, avant de valider. Un groupe de
  *   deux photos va directement au résumé (un duel n'apporterait rien de plus).
+ * « Pas des doublons » / « Pas inutiles » met le groupe de côté (`ignored.ts`) et passe au suivant.
  * Chaque photo a un bouton « Plein écran » (la visionneuse, flèches pour passer aux autres photos du groupe).
  * Rien n'est supprimé ici : les choix sont retenus, la suppression se fait à la fin (`RemoveDialog`).
  */
@@ -33,8 +35,9 @@ import {
 } from '../lib/choices';
 import { PhotoImage } from './PhotoImage';
 import { likenessText, photoDetails, reasonsText } from './photoText';
+import { addStats, countSwipe } from '../lib/statsStore';
 import { useThumbs } from './useThumbs';
-import { SwipeCard } from './SwipeCard';
+import { SwipeSorter, swipeQueue } from './SwipeSorter';
 import { useView, VIEWS, type SortView } from './useView';
 import { Viewer } from './Viewer';
 
@@ -44,16 +47,20 @@ const FULL_IMAGES_MAX = 12;
 interface Props {
   groups: Group[];
   start: number;
+  /** Revoir un tri déjà fait : toutes les photos (swipe) ou tous les groupes (grille) défilent, même triés. */
+  review: boolean;
   photos: PhotoInfo[];
   files: Map<string, FoundFile>;
   marks: ReadonlyMap<string, Mark>;
   pending: Pending;
   onSave: (group: Group, choice: Choice) => void;
+  /** « Pas des doublons », « Pas inutiles ». */
+  onIgnore: (group: Group) => void;
   onRemove: () => void;
   onClose: () => void;
 }
 
-export function Sorter({ groups, start, photos, files, marks, pending, onSave, onRemove, onClose }: Props) {
+export function Sorter({ groups, start, review, photos, files, marks, pending, onSave, onIgnore, onRemove, onClose }: Props) {
   const [index, setIndex] = useState(start);
   // Doublons : grille ou duels ; photos inutiles : grille ou swipe (la file ne mélange jamais les deux).
   const family = groups[0]?.kind === 'junk' ? 'junk' : 'dup';
@@ -62,11 +69,13 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
   const viewName: Record<SortView, string> = { grid: T.sort.grid, duel: T.sort.duels, swipe: T.sort.swipe };
   /** Groupes passés pendant ce tri : proposés à la fin. */
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  /** Groupes mis de côté pendant ce tri. */
+  const [ignored, setIgnored] = useState<Set<string>>(new Set());
 
   const nextUnsorted = (from: number, sortedNow?: string) => {
     for (let i = from; i < groups.length; i++) {
       const g = groups[i];
-      if (g.id !== sortedNow && !isSorted(g, photos, marks) && !skipped.has(g.id)) return i;
+      if (review || (g.id !== sortedNow && !ignored.has(g.id) && !isSorted(g, photos, marks) && !skipped.has(g.id))) return i;
     }
     return groups.length;
   };
@@ -84,18 +93,48 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
     setSkipped((s) => new Set(s).add(group.id));
     setIndex(index + 1);
   };
+  const ignore = (group: Group) => {
+    onIgnore(group);
+    setIgnored((s) => new Set(s).add(group.id));
+    setIndex(nextUnsorted(index + 1, group.id));
+  };
 
   const group = groups[index] as Group | undefined;
-  const unsortedLeft = groups.filter((g) => !isSorted(g, photos, marks)).length;
+  const unsortedLeft = groups.filter((g) => !ignored.has(g.id) && !isSorted(g, photos, marks)).length;
+
+  // Swipe : une photo à la fois, dans l'ordre des groupes.
+  const swiping = family === 'junk' && view === 'swipe';
+  const queue = useMemo(() => swipeQueue(groups), [groups]);
+  const firstOf = (rank: number) => {
+    const mine = queue.findIndex((q) => q.rank === rank && !marks.has(photos[q.photo].key));
+    return Math.max(0, mine >= 0 ? mine : queue.findIndex((q) => q.rank === rank));
+  };
+  const [pos, setPos] = useState(() => firstOf(start));
+  const nextOf = (from: number) => {
+    for (let i = from + 1; i < queue.length; i++) {
+      const q = queue[i];
+      // Déjà triée : sautée, sauf dans le groupe qu'on a rouvert (« Modifier le tri ») ou en revoyant tout le tri.
+      if (review || q.rank === start || !marks.has(photos[q.photo].key)) return i;
+    }
+    return null;
+  };
+  const changeView = (v: SortView) => {
+    if (v === view) return;
+    if (family === 'junk') {
+      if (v === 'swipe') setPos(firstOf(Math.min(index, groups.length - 1)));
+      else if (queue.length) setIndex(queue[pos].rank);
+    }
+    setView(v);
+  };
 
   return createPortal(
     <div className="sorter" role="dialog" aria-modal="true" aria-label={title}>
       <div className="sorter-bar">
-        <strong className="where">{group ? T.sort.groupOf(index + 1, groups.length) : title}</strong>
+        <strong className="where">{swiping ? T.sort.photoOf(pos + 1, queue.length) : group ? T.sort.groupOf(index + 1, groups.length) : title}</strong>
         <div className="view-switch" role="group" aria-label={T.sort.view}>
           <span className="muted small">{T.sort.view}</span>
           {VIEWS[family].map((v) => (
-            <button key={v} className={view === v ? 'toggle on' : 'toggle'} aria-pressed={view === v} onClick={() => setView(v)}>
+            <button key={v} className={view === v ? 'toggle on' : 'toggle'} aria-pressed={view === v} onClick={() => changeView(v)}>
               {viewName[v]}
             </button>
           ))}
@@ -105,7 +144,22 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
         </button>
       </div>
 
-      {group ? (
+      {swiping ? (
+        <SwipeSorter
+          queue={queue}
+          pos={pos}
+          onPos={setPos}
+          photos={photos}
+          files={files}
+          marks={marks}
+          nextOf={nextOf}
+          onSave={(item, mark) => {
+            onSave(item.group, { [photos[item.photo].key]: mark });
+            countSwipe();
+          }}
+          onEnd={onClose}
+        />
+      ) : group ? (
         <GroupSorter
           key={`${group.id}:${view}`}
           group={group}
@@ -117,6 +171,7 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
           onPrev={() => setIndex(index - 1)}
           onSkip={() => skip(group)}
           onValidate={(choice) => validate(group, choice)}
+          onIgnore={() => ignore(group)}
         />
       ) : (
         <div className="sorter-end">
@@ -131,7 +186,7 @@ export function Sorter({ groups, start, photos, files, marks, pending, onSave, o
                 className="secondary"
                 onClick={() => {
                   setSkipped(new Set());
-                  const first = groups.findIndex((g) => !isSorted(g, photos, marks));
+                  const first = groups.findIndex((g) => !ignored.has(g.id) && !isSorted(g, photos, marks));
                   setIndex(first < 0 ? groups.length : first);
                 }}
               >
@@ -161,13 +216,13 @@ interface GroupProps {
   onPrev: () => void;
   onSkip: () => void;
   onValidate: (choice: Choice) => void;
+  onIgnore: () => void;
 }
 
-function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSkip, onValidate }: GroupProps) {
+function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSkip, onValidate, onIgnore }: GroupProps) {
   const [choice, setChoice] = useState<Choice>(() => initialChoice(group, photos, marks));
   const canDuel = group.members.length > 2 && !group.junk;
   const [duel, setDuel] = useState<Duel | null>(() => (view === 'duel' && canDuel && !isSorted(group, photos, marks) ? startDuel(group) : null));
-  const swiping = view === 'swipe' && !!group.junk;
   const [viewing, setViewing] = useState<number | null>(null);
   const keys = useMemo(() => group.members.map((i) => photos[i].key), [group, photos]);
   const thumbs = useThumbs(keys);
@@ -177,7 +232,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
   const remove = group.members.length - keep;
 
   useEffect(() => {
-    if (inDuel || swiping || viewing !== null) return;
+    if (inDuel || viewing !== null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       const n = Number(e.key);
@@ -191,10 +246,11 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [inDuel, swiping, viewing, group, photos, choice, onValidate]);
+  }, [inDuel, viewing, group, photos, choice, onValidate]);
 
   const pick = (winner: number) => {
     const next = pickWinner(duel!, winner);
+    addStats({ duels: 1 });
     setDuel(next);
     if (duelDone(next)) setChoice(onlyKeep(group, photos, next.champion));
   };
@@ -207,7 +263,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
       <span className="muted">{photos[group.members[0]].time ? dateTime(photos[group.members[0]].time!) : T.group.noDate}</span>
       {inDuel ? (
         <span className="muted">{T.sort.duelOf(duel!.next, group.members.length - 1)}</span>
-      ) : swiping ? null : (
+      ) : (
         <span className="muted" data-testid="counts">
           {T.sort.counts(keep, remove)}
         </span>
@@ -227,32 +283,6 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
         onToggle={inDuel ? undefined : (key) => setChoice((c) => toggle(c, key))}
       />
     ) : null;
-
-  if (swiping) {
-    return (
-      <div className="sorter-body swipe-body">
-        {head}
-        <SwipeCard
-          group={group}
-          photos={photos}
-          files={files}
-          thumbs={thumbs}
-          paused={viewing !== null}
-          onDecide={(mark) => onValidate(allAs(group, photos, mark))}
-          onZoom={() => setViewing(0)}
-        />
-        <div className="sorter-actions">
-          <button className="secondary" onClick={onPrev} disabled={!hasPrev}>
-            ‹ {T.sort.prev}
-          </button>
-          <button className="secondary" onClick={onSkip}>
-            {T.sort.skip} ›
-          </button>
-        </div>
-        {viewer}
-      </div>
-    );
-  }
 
   if (inDuel) {
     const pair = [duel!.champion, challenger(duel!)];
@@ -364,6 +394,9 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
           </button>
           <button className="secondary" onClick={() => setChoice(allAs(group, photos, 'remove'))}>
             {T.sort.removeAll}
+          </button>
+          <button className="secondary" onClick={onIgnore}>
+            {group.junk ? T.group.wrongJunk : T.group.wrong}
           </button>
           {view === 'duel' && canDuel && (
             <button className="secondary" onClick={() => setDuel(startDuel(group))}>

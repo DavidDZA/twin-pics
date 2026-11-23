@@ -5,9 +5,10 @@
  *   inchangée (même chemin, même taille, même date de modification) n'est jamais réanalysée : relancer l'analyse
  *   d'un dossier déjà vu prend quelques secondes.
  * - `thumbs` : miniatures JPEG (200 px), à part pour garder `photos` légère.
- * - `labels` : les réponses « bien trouvé » / « pas des doublons » sur les groupes, pour régler les seuils.
- * - `marks` : le tri, photo par photo (« garder » / « supprimer »), retenu jusqu'à la suppression (`choices.ts`).
- * - `meta` : dernier dossier ouvert (son accès, avec la File System Access API), réglages.
+ * - `labels` : les groupes « Pas des doublons » / « Pas inutiles », mis de côté (`ignored.ts`).
+ * - `marks` (doublons) et `junkMarks` (photos inutiles) : le tri, photo par photo (« garder » / « supprimer »), retenu
+ *   jusqu'à la suppression (`choices.ts`). Deux tables : les deux fonctions ne se mélangent pas.
+ * - `meta` : dernier dossier ouvert (son accès, avec la File System Access API), versions des modèles, stats.
  */
 import Dexie, { type Table } from 'dexie';
 import type { Kind, Params } from './groups';
@@ -44,6 +45,7 @@ export interface ThumbRow {
   blob: Blob;
 }
 
+/** `good` (« Bien trouvé ») : anciennes réponses (jusqu'à la version 0.4), plus utilisées. */
 export type Verdict = 'good' | 'wrong';
 
 export interface LabelRow {
@@ -51,7 +53,7 @@ export interface LabelRow {
   verdict: Verdict;
   kind: Kind;
   keys: string[];
-  params: Params;
+  params?: Params;
   at: number;
 }
 
@@ -75,6 +77,7 @@ class TwinPicsDB extends Dexie {
   labels!: Table<LabelRow, string>;
   meta!: Table<MetaRow, string>;
   marks!: Table<MarkRow, string>;
+  junkMarks!: Table<MarkRow, string>;
 
   constructor() {
     super('twin-pics');
@@ -85,6 +88,13 @@ class TwinPicsDB extends Dexie {
       meta: '&key',
     });
     this.version(2).stores({ marks: '&key, groupId' });
+    // Version 3 (appli 0.5) : le tri des photos inutiles (groupes « j… ») a sa propre table.
+    this.version(3)
+      .stores({ junkMarks: '&key, groupId' })
+      .upgrade(async (tx) => {
+        const rows = await tx.table<MarkRow>('marks').where('groupId').startsWith('j').toArray();
+        await tx.table('junkMarks').bulkPut(rows);
+      });
   }
 }
 

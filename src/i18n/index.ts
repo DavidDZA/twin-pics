@@ -92,4 +92,6 @@ export function duration(seconds: number, locale = LOCALE): string {
 }
 
 const dateFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
+const dayFormat = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium' });
+export const day = (ms: number) => dayFormat.format(ms);
 export const dateTime = (ms: number) => dateFormat.format(ms);

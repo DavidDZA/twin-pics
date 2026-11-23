@@ -61,6 +61,13 @@ main {
   flex: 1;
 }
 
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .top h1 {
   font-size: 1.4rem;
   margin: 18px 0 8px;
@@ -215,7 +222,7 @@ button.link {
 /* Résultats */
 .tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 12px 0;
 }
@@ -486,6 +493,29 @@ button.link {
   align-items: center;
   justify-content: center;
   padding: 0 16px;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.viewer-body.zoomed {
+  cursor: grab;
+}
+
+.viewer-body.zoomed:active {
+  cursor: grabbing;
+}
+
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-bar button {
+  padding: 4px 12px;
 }
 
 .viewer-body img {
@@ -526,8 +556,8 @@ select {
 
 /* Téléphone */
 @media (max-width: 600px) {
-  .tiles {
-    grid-template-columns: repeat(2, 1fr);
+  .tile {
+    padding: 10px;
   }
 
   .slider {

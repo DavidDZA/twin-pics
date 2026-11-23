@@ -7,7 +7,7 @@
  * 1. liste des photos (fait avant, `files.ts`) ;
  * 2. reprise de ce qui est déjà en base (photos inchangées : rien à refaire ; mesurées avec une ancienne version des
  *    mesures de qualité : réanalysées) ;
- * 3. les modèles se chargent pendant que l'analyse commence : DINOv2 (photos similaires, `embed.worker.ts`) et
+ * 3. les modèles se chargent (seulement si une photo en a besoin) pendant que l'analyse commence : DINOv2 (photos similaires, `embed.worker.ts`) et
  *    MobileCLIP (photos inutiles, `clip.worker.ts`), chacun s'il est demandé ;
  * 4. chaque nouvelle photo est lue, analysée (`analyze.worker.ts`) et passe aussitôt dans les modèles : DINOv2 si
  *    elle est datée, MobileCLIP toujours ; la petite version préparée par l'analyse suffit, pas de second décodage ;
@@ -16,7 +16,7 @@
  *    temps) ;
  * 6. paires candidates (`findPairs`, dans un worker : la comparaison de toutes les photos deux à deux).
  */
-import { db, photoKey, type PhotoRow } from './db';
+import { db, getMeta, photoKey, setMeta, type PhotoRow } from './db';
 import { LIMITS, type Pair, type PhotoInfo } from './groups';
 import type { AnalyzeRequest, AnalyzeResult, EmbedMessage, EmbedRequest, ModelDevice, Pixels } from './messages';
 import type { FoundFile, Listing } from './files';
@@ -26,8 +26,11 @@ import { clipId } from './junk';
 import { QUALITY_VERSION } from './quality';
 import { Limiter, WorkerPool } from './pool';
 
-/** `model` : téléchargement des modèles ; `similar` : passage des photos dans les modèles. */
-export type Phase = 'analyze' | 'model' | 'similar' | 'pairs';
+/**
+ * `model` : téléchargement des modèles ; `loading` : leur préparation (déjà sur l'appareil) ; `similar` : passage des
+ * photos dans les modèles.
+ */
+export type Phase = 'analyze' | 'model' | 'loading' | 'similar' | 'pairs';
 
 export interface Progress {
   phase: Phase;
@@ -120,6 +123,13 @@ export function needsVector(rows: PhotoRow[]): PhotoRow[] {
   });
 }
 
+/** Version de chaque modèle à la dernière analyse (meta `models`) : inutile de le charger si toutes l'ont déjà vue. */
+interface KnownModel {
+  id: string;
+  device: ModelDevice;
+}
+const MODELS_KEY = 'models';
+
 interface Model {
   pool: WorkerPool<EmbedRequest, EmbedMessage>;
   id: string;
@@ -130,13 +140,13 @@ interface Model {
  * Charge un modèle dans un worker (et un second sur le processeur, deux fois plus rapide à deux). `make` crée le
  * worker (écrit en toutes lettres pour que Vite l'empaquette) ; `idOf` nomme la version du modèle.
  */
-async function loadModel(make: () => Worker, idOf: (dtype: string) => string, onBytes: (loaded: number, total: number) => void): Promise<Model> {
+async function loadModel(make: () => Worker, idOf: (dtype: string) => string, onBytes: (loaded: number, total: number, cached: boolean) => void): Promise<Model> {
   const start = (device: 'auto' | 'wasm') =>
     new Promise<{ worker: Worker; device: ModelDevice; dtype: string }>((resolve, reject) => {
       const worker = make();
       worker.onmessage = (e: MessageEvent<EmbedMessage>) => {
         const m = e.data;
-        if (m.type === 'progress') onBytes(m.loaded, m.total);
+        if (m.type === 'progress') onBytes(m.loaded, m.total, m.cached);
         else if (m.type === 'ready') resolve({ worker, device: m.device, dtype: m.dtype });
         else if (m.type === 'error') {
           worker.terminate();
@@ -166,7 +176,7 @@ interface Slot {
   promise: Promise<Model | null>;
   model: Model | null;
   error?: string;
-  bytes: { loaded: number; total: number };
+  bytes: { loaded: number; total: number; cached: boolean };
 }
 
 export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanResult> {
@@ -200,12 +210,14 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
     if (!waitingForModel) return;
     const loaded = slots.reduce((s, x) => s + x.bytes.loaded, 0);
     const total = slots.reduce((s, x) => s + x.bytes.total, 0);
-    onProgress({ phase: 'model', done: loaded, total });
+    // Rien à télécharger : on ne montre pas d'octets, le modèle est seulement relu et préparé.
+    const downloading = slots.some((x) => !x.bytes.cached && x.bytes.total > 0 && !x.model);
+    onProgress(downloading ? { phase: 'model', done: loaded, total } : { phase: 'loading', done: 0, total: 0 });
   };
-  const slot = (load: (onBytes: (l: number, t: number) => void) => Promise<Model>): Slot => {
-    const s: Slot = { promise: Promise.resolve(null), model: null, bytes: { loaded: 0, total: 0 } };
-    s.promise = load((loaded, total) => {
-      s.bytes = { loaded, total };
+  const slot = (load: (onBytes: (l: number, t: number, cached: boolean) => void) => Promise<Model>): Slot => {
+    const s: Slot = { promise: Promise.resolve(null), model: null, bytes: { loaded: 0, total: 0, cached: false } };
+    s.promise = load((loaded, total, cached) => {
+      s.bytes = { loaded, total, cached };
       showBytes();
     }).then(
       (m) => (s.model = m),
@@ -217,8 +229,19 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
     slots.push(s);
     return s;
   };
-  const dino = opts.similar ? slot((b) => loadModel(() => new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' }), embedId, b)) : null;
-  const clip = opts.junkModel ? slot((b) => loadModel(() => new Worker(new URL('./clip.worker.ts', import.meta.url), { type: 'module' }), clipId, b)) : null;
+  // Un modèle n'est chargé que s'il a des photos à voir : nouvelles, ou sans vecteur de sa version.
+  const known = (await getMeta<{ dino?: KnownModel; clip?: KnownModel }>(MODELS_KEY).catch(() => undefined)) ?? {};
+  const all = [...rows.values()];
+  const upToDate = (k: KnownModel | undefined, wanting: PhotoRow[], idOf: (r: PhotoRow) => string | undefined) =>
+    !todo.length && !!k && (forcedDevice() === 'auto' || k.device === 'wasm') && wanting.every((r) => idOf(r) === k.id);
+  const dinoReady = upToDate(known.dino, needsVector(all), (r) => r.embModel);
+  const clipReady = upToDate(
+    known.clip,
+    all.filter((r) => !r.error),
+    (r) => r.clipModel,
+  );
+  const dino = opts.similar && !dinoReady ? slot((b) => loadModel(() => new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' }), embedId, b)) : null;
+  const clip = opts.junkModel && !clipReady ? slot((b) => loadModel(() => new Worker(new URL('./clip.worker.ts', import.meta.url), { type: 'module' }), clipId, b)) : null;
   const wantPixels: AnalyzeRequest['wantPixels'] = clip ? 'all' : dino ? 'dated' : 'none';
 
   const analyzers = new WorkerPool<AnalyzeRequest, AnalyzeResult>(
@@ -342,8 +365,14 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
     await Promise.all(writes);
   }
 
+  if (dino?.model) known.dino = { id: dino.model.id, device: dino.model.device };
+  if (clip?.model) known.clip = { id: clip.model.id, device: clip.model.device };
+  await setMeta(MODELS_KEY, known);
+
   // Paires candidates.
-  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dino?.model?.id, clip?.model?.id));
+  const dinoId = dino ? dino.model?.id : opts.similar ? known.dino?.id : undefined;
+  const clipModelId = clip ? clip.model?.id : opts.junkModel ? known.clip?.id : undefined;
+  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dinoId, clipModelId));
   onProgress({ phase: 'pairs', done: 0, total: photos.length });
   const pairs = await computePairs(photos, signal);
 

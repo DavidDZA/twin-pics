@@ -5,6 +5,7 @@ import { LANG, T } from './i18n';
 import './styles.css';
 import './sort.css';
 import './junk.css';
+import './space.css';
 import './theme.css';
 
 document.documentElement.lang = LANG;

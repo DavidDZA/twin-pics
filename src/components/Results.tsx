@@ -1,35 +1,51 @@
 /**
- * Les résultats : chiffres, tri (`Sorter`), suppression (`RemoveDialog`), réglages de la détection, groupes.
- * Onglets : tous les doublons, chaque niveau, et les photos **inutiles** (`junk.ts`, leurs propres réglages ; une photo
- * déjà dans un groupe de doublons n'y est pas).
+ * Les résultats, une seule page. En haut : **Doublons | Photos inutiles** (deux fonctions séparées, un clic pour passer
+ * de l'une à l'autre ; la dernière ouverte est retenue), « Relancer », « Autre dossier », « Effacer tous mes choix… ».
+ * En dessous, la fonction choisie (`Space`), avec ses réglages, son tri, sa suppression (`RemoveDialog`) et ses propres
+ * choix (`marks`, `junkMarks`).
  *
- * Les photos supprimées pendant la session disparaissent des groupes (`gone`) ; le tri (« garder » / « supprimer »)
- * est retenu en base photo par photo (`marks`), jusqu'à la suppression.
+ * Les photos supprimées pendant la session disparaissent des groupes (`gone`) ; le tri est retenu en base photo par
+ * photo, jusqu'à la suppression ; « Pas des doublons » / « Pas inutiles » mettent un groupe de côté (`ignored.ts`).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { T, bytes, duration, num } from '../i18n';
-import { buildGroups, DEFAULTS, type Group, type Kind, type Params } from '../lib/groups';
-import { db, type LabelRow, type MarkRow, type Verdict } from '../lib/db';
-import { isSorted, pendingRemoval, type Choice, type Mark } from '../lib/choices';
+import { buildGroups, DEFAULTS, type Group, type Params } from '../lib/groups';
+import { db, type LabelRow, type MarkRow } from '../lib/db';
+import { isSorted, pendingRemoval, type Choice, type Mark, type Pending } from '../lib/choices';
+import { coveringLabels, ignoredKeys, splitIgnored, wrongLabels } from '../lib/ignored';
+import { notify } from '../lib/notify';
+import { sortedStats } from '../lib/stats';
+import { addStats } from '../lib/statsStore';
 import type { ScanResult } from '../lib/scan';
 import { desktop, readRemoveSettings, removeFolder, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
 import { setDisplayRoot } from '../lib/display';
 import { buildJunkGroups, clipScores, junkReasons, JUNK_DEFAULTS, JUNK_REASONS, type JunkParams, type JunkPrompts } from '../lib/junk';
 import junkPrompts from '../lib/junkPrompts.json';
-import { GroupCard } from './GroupCard';
 import { JunkSettings } from './JunkSettings';
 import { RemoveDialog } from './RemoveDialog';
+import { ResetDialog } from './ResetDialog';
 import { SettingsPanel } from './SettingsPanel';
-import { Sorter } from './Sorter';
-import { Viewer } from './Viewer';
+import { Space, totals, type Fn } from './Space';
 
 const PARAMS_KEY = 'detect-params';
 const JUNK_KEY = 'junk-params';
+/** La dernière fonction ouverte (« dup » ou « junk »). */
+const SPACE_KEY = 'last-function';
 const PROMPTS = junkPrompts as JunkPrompts;
-const PAGE = 30;
-const KINDS: Kind[] = ['exact', 'near', 'similar', 'junk'];
 /** Photos envoyées à l'appli PC à la fois (pour suivre la progression). */
 const REMOVE_BATCH = 20;
+
+const table = (fn: Fn) => (fn === 'dup' ? db.marks : db.junkMarks);
+const FNS: Fn[] = ['dup', 'junk'];
+type Marks = Record<Fn, Map<string, Mark>>;
+
+function readSpace(): Fn {
+  try {
+    return localStorage.getItem(SPACE_KEY) === 'junk' ? 'junk' : 'dup';
+  } catch {
+    return 'dup';
+  }
+}
 
 function readParams(): Params {
   try {
@@ -62,12 +78,15 @@ function readJunkParams(): JunkParams {
 
 /** Ce qu'a donné la dernière suppression. */
 interface Report {
+  fn: Fn;
   mode: RemoveMode;
   folder: string;
   done: number;
   bytes: number;
-  /** Mode dossier : de quoi annuler (clé de la photo, où elle est, sa place d'origine). */
-  moves: (Move & { key: string })[];
+  /** Dont copies exactes (stats). */
+  exact: number;
+  /** Mode dossier : de quoi annuler (clé de la photo, sa taille, où elle est, sa place d'origine). */
+  moves: (Move & { key: string; size: number; exact: boolean })[];
   failedTrash: number;
   failedMissing: number;
   failedOther: number;
@@ -86,14 +105,12 @@ interface Props {
 export function Results({ result, onRescan, canRescan, onAnother, root }: Props) {
   const [params, setParamsState] = useState<Params>(readParams);
   const [junkParams, setJunkParamsState] = useState<JunkParams>(readJunkParams);
-  const [tab, setTab] = useState<Kind | 'all'>('all');
-  const [shown, setShown] = useState(PAGE);
+  const [space, setSpace] = useState<Fn>(readSpace);
   const [labels, setLabels] = useState<Map<string, LabelRow>>(new Map());
-  const [marks, setMarks] = useState<Map<string, Mark>>(new Map());
+  const [marks, setMarks] = useState<Marks>({ dup: new Map(), junk: new Map() });
   const [gone, setGone] = useState<Set<string>>(new Set());
-  const [viewing, setViewing] = useState<{ group: Group; index: number } | null>(null);
-  const [sorting, setSorting] = useState<{ groups: Group[]; start: number } | null>(null);
-  const [removing, setRemoving] = useState(false);
+  const [removing, setRemoving] = useState<{ fn: Fn; exact: Pending | null } | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [working, setWorking] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [removeSettings, setRemoveSettingsState] = useState<RemoveSettings>(readRemoveSettings);
@@ -120,78 +137,152 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
     setRemoveSettingsState(s);
     saveRemoveSettings(s);
   };
+  const openSpace = (fn: Fn) => {
+    setSpace(fn);
+    try {
+      localStorage.setItem(SPACE_KEY, fn);
+    } catch {
+      // Dernière fonction non retenue.
+    }
+    window.scrollTo(0, 0);
+  };
 
   useEffect(() => {
+    const load = (rows: MarkRow[]) => new Map(rows.map((r) => [r.key, r.mark]));
     db.labels.toArray().then((rows) => setLabels(new Map(rows.map((r) => [r.groupId, r]))));
-    db.marks.toArray().then((rows) => setMarks(new Map(rows.map((r) => [r.key, r.mark]))));
+    Promise.all([db.marks.toArray(), db.junkMarks.toArray()]).then(([dup, junk]) => setMarks({ dup: load(dup), junk: load(junk) }));
   }, []);
 
+  // Doublons.
   const pairs = useMemo(() => (gone.size ? result.pairs.filter((p) => !gone.has(photos[p.a].key) && !gone.has(photos[p.b].key)) : result.pairs), [result, photos, gone]);
-  const groups = useMemo(() => buildGroups(photos, pairs, params), [photos, pairs, params]);
+  const built = useMemo(() => buildGroups(photos, pairs, params), [photos, pairs, params]);
+  const dup = useMemo(() => splitIgnored(built, photos, wrongLabels(labels.values(), false)), [built, photos, labels]);
+
   // Photos inutiles : probabilités du modèle (une fois), raisons et groupes (à chaque réglage).
   const scores = useMemo(() => photos.map((p) => (p.clip ? clipScores(p.clip, PROMPTS) : undefined)), [photos]);
   const reasons = useMemo(() => photos.map((p, i) => junkReasons({ ...p, scores: scores[i] }, junkParams)), [photos, scores, junkParams]);
-  const junkGroups = useMemo(() => {
-    const exclude = new Set<number>();
-    for (const g of groups) for (const i of g.members) exclude.add(i);
-    photos.forEach((p, i) => gone.has(p.key) && exclude.add(i));
-    return buildJunkGroups(photos, reasons, junkParams, exclude);
-  }, [photos, groups, reasons, junkParams, gone]);
+  const junk = useMemo(() => {
+    const aside = ignoredKeys(wrongLabels(labels.values(), true));
+    const hidden = new Set<number>();
+    const kept = new Set<number>();
+    photos.forEach((p, i) => {
+      if (gone.has(p.key) || aside.has(p.key)) hidden.add(i);
+      if (gone.has(p.key) || !aside.has(p.key)) kept.add(i);
+    });
+    return {
+      shown: buildJunkGroups(photos, reasons, junkParams, hidden),
+      ignored: aside.size ? buildJunkGroups(photos, reasons, junkParams, kept) : [],
+    };
+  }, [photos, reasons, junkParams, labels, gone]);
   const hasModel = useMemo(() => photos.some((p) => p.clip), [photos]);
 
-  const counts = useMemo(() => {
-    const c: Record<Kind, number> = { exact: 0, near: 0, similar: 0, junk: junkGroups.length };
-    for (const g of groups) c[g.kind]++;
-    return c;
-  }, [groups, junkGroups]);
-  const isJunk = tab === 'junk';
-  const visible = tab === 'all' ? groups : isJunk ? junkGroups : groups.filter((g) => g.kind === tab);
-  // Doublons : photos en trop (toutes sauf une par groupe) ; inutiles : toutes.
-  const extra = visible.reduce((s, g) => s + g.members.length - (isJunk ? 0 : 1), 0);
-  const wasted = visible.reduce((s, g) => s + g.wasted, 0);
-  const allGroups = useMemo(() => [...groups, ...junkGroups], [groups, junkGroups]);
-  const pending = useMemo(() => pendingRemoval(allGroups, photos, marks), [allGroups, photos, marks]);
-  const sortedCount = visible.filter((g) => isSorted(g, photos, marks)).length;
+  const groups: Record<Fn, { shown: Group[]; ignored: Group[] }> = { dup, junk };
+  const pending = useMemo<Record<Fn, Pending>>(
+    () => ({ dup: pendingRemoval(dup.shown, photos, marks.dup), junk: pendingRemoval(junk.shown, photos, marks.junk) }),
+    [dup, junk, photos, marks],
+  );
 
-  const verdicts = [...labels.values()];
-  const good = verdicts.filter((l) => l.verdict === 'good').length;
-  const wrong = verdicts.length - good;
-
-  const label = async (group: Group, verdict: Verdict | null) => {
-    const next = new Map(labels);
-    if (verdict === null) {
-      next.delete(group.id);
-      await db.labels.delete(group.id);
-    } else {
-      const row: LabelRow = { groupId: group.id, verdict, kind: group.kind, keys: group.members.map((i) => photos[i].key), params, at: Date.now() };
-      next.set(group.id, row);
-      await db.labels.put(row);
+  /** Les choix à effacer d'une fonction : photos triées et groupes mis de côté de ce dossier. */
+  const choicesOf = (fn: Fn) => {
+    const keys = photos.filter((p) => marks[fn].has(p.key)).map((p) => p.key);
+    const here = new Set(photos.map((p) => p.key));
+    const rows = wrongLabels(labels.values(), fn === 'junk').filter((l) => l.keys.some((k) => here.has(k)));
+    return { keys, rows };
+  };
+  const hasChoices = (fn: Fn) => {
+    const c = choicesOf(fn);
+    return c.keys.length + c.rows.length > 0;
+  };
+  const reset = () => {
+    for (const fn of FNS) {
+      const { keys, rows } = choicesOf(fn);
+      dropMarks(fn, keys);
+      void db.labels.bulkDelete(rows.map((r) => r.groupId));
+      setLabels((m) => {
+        const n = new Map(m);
+        for (const r of rows) n.delete(r.groupId);
+        return n;
+      });
     }
-    setLabels(next);
+    setResetting(false);
   };
 
-  const saveChoice = useCallback((group: Group, choice: Choice) => {
-    const at = Date.now();
-    const rows: MarkRow[] = Object.entries(choice).map(([key, mark]) => ({ key, mark, groupId: group.id, at }));
+  const dropMarks = (fn: Fn, keys: string[]) => {
     setMarks((m) => {
+      const n = new Map(m[fn]);
+      for (const k of keys) n.delete(k);
+      return { ...m, [fn]: n };
+    });
+    void table(fn).bulkDelete(keys);
+  };
+
+  const restore = async (rows: LabelRow[]) => {
+    setLabels((m) => {
       const n = new Map(m);
-      for (const r of rows) n.set(r.key, r.mark);
+      for (const r of rows) n.delete(r.groupId);
       return n;
     });
-    void db.marks.bulkPut(rows);
-  }, []);
-
-  const startSorting = (queue: Group[], start?: number) => {
-    const first = start ?? queue.findIndex((g) => !isSorted(g, photos, marks));
-    setSorting({ groups: queue, start: first < 0 ? queue.length : first });
+    await db.labels.bulkDelete(rows.map((r) => r.groupId));
+  };
+  const ignore = (group: Group) => {
+    const row: LabelRow = { groupId: group.id, verdict: 'wrong', kind: group.kind, keys: group.members.map((i) => photos[i].key), at: Date.now() };
+    setLabels((m) => new Map(m).set(group.id, row));
+    void db.labels.put(row);
+    addStats({ ignored: 1 });
+    notify({ text: T.ignored.done, action: { label: T.remove.undo, run: () => void restore([row]) } });
+  };
+  const restoreGroup = (fn: Fn, group: Group) => {
+    const all = wrongLabels(labels.values(), fn === 'junk');
+    const keys = new Set(group.members.map((i) => photos[i].key));
+    void restore(fn === 'junk' ? all.filter((l) => l.keys.some((k) => keys.has(k))) : coveringLabels(group, photos, all));
   };
 
+  const shown = useMemo<Record<Fn, Group[]>>(() => ({ dup: dup.shown, junk: junk.shown }), [dup, junk]);
+  const saveChoice = useCallback(
+    (fn: Fn, group: Group, choice: Choice) => {
+      const at = Date.now();
+      const rows: MarkRow[] = Object.entries(choice).map(([key, mark]) => ({ key, mark, groupId: group.id, at }));
+      const before = marks[fn];
+      const fresh = rows.filter((r) => !before.has(r.key));
+      if (fresh.length) {
+        const times = new Map(group.members.map((i) => [photos[i].key, photos[i].time]));
+        const { plus, record } = sortedStats(fresh.map((r) => ({ mark: r.mark, time: times.get(r.key) })));
+        if (fn === 'dup' && !isSorted(group, photos, before)) {
+          const kept = rows.filter((r) => r.mark === 'keep').length;
+          Object.assign(plus, { groups: 1, keptAll: kept === rows.length ? 1 : 0, noneKept: kept ? 0 : 1 });
+          record.biggestGroup = rows.length;
+        }
+        // Dernière photo de la liste : tout est trié.
+        const after = new Map([...before, ...rows.map((r) => [r.key, r.mark] as const)]);
+        if (shown[fn].every((g) => isSorted(g, photos, after)) && !shown[fn].every((g) => isSorted(g, photos, before))) plus.perfect = 1;
+        addStats(plus, record);
+      }
+      setMarks((m) => {
+        const n = new Map(m[fn]);
+        for (const r of rows) n.set(r.key, r.mark);
+        return { ...m, [fn]: n };
+      });
+      void table(fn).bulkPut(rows);
+    },
+    [marks, photos, shown],
+  );
+
+  /** Compte (ou décompte, après « Annuler ») des photos supprimées dans les stats. */
+  const countRemoved = (fn: Fn, n: number, size: number, exact: number, sign: 1 | -1) =>
+    addStats(
+      { [fn === 'dup' ? 'removedDup' : 'removedJunk']: sign * n, removedExact: sign * exact, freed: sign * size, ...(sign === 1 ? { removals: 1 } : { undone: n }) },
+      sign === 1 ? { biggestClean: n } : {},
+    );
+
   const remove = async () => {
-    if (!desktop || !root) return;
-    const targets = pending.remove.map((i) => photos[i]);
+    if (!desktop || !root || !removing) return;
+    const { fn } = removing;
+    const plan = removing.exact ?? pending[fn];
+    const targets = plan.remove.map((i) => photos[i]);
+    const exactKeys = new Set(plan.plans.filter((p) => p.group.kind === 'exact').flatMap((p) => p.remove.map((i) => photos[i].key)));
     const byPath = new Map(targets.map((p) => [p.path, p]));
     const folder = removeFolder(removeSettings, root, T.remove.folderName);
-    const r: Report = { mode: removeSettings.mode, folder, done: 0, bytes: 0, moves: [], failedTrash: 0, failedMissing: 0, failedOther: 0 };
+    const r: Report = { fn, mode: removeSettings.mode, folder, done: 0, bytes: 0, exact: 0, moves: [], failedTrash: 0, failedMissing: 0, failedOther: 0 };
     const removed: string[] = [];
     setWorking({ done: 0, total: targets.length });
     try {
@@ -203,8 +294,9 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
           if (o.ok) {
             r.done++;
             r.bytes += p.size;
+            if (exactKeys.has(p.key)) r.exact++;
             removed.push(p.key);
-            if (o.movedTo) r.moves.push({ key: p.key, from: o.movedTo, to: o.path });
+            if (o.movedTo) r.moves.push({ key: p.key, size: p.size, exact: exactKeys.has(p.key), from: o.movedTo, to: o.path });
           } else if (o.error === 'trash') r.failedTrash++;
           else if (o.error === 'missing') {
             r.failedMissing++;
@@ -215,75 +307,61 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
       }
     } finally {
       setGone((g) => new Set([...g, ...removed]));
-      setMarks((m) => {
-        const n = new Map(m);
-        for (const k of removed) n.delete(k);
-        return n;
-      });
-      void db.marks.bulkDelete(removed);
+      dropMarks('dup', removed);
+      dropMarks('junk', removed);
+      if (r.done) countRemoved(fn, r.done, r.bytes, r.exact, 1);
       setWorking(null);
-      setRemoving(false);
+      setRemoving(null);
       setReport(r);
+      window.scrollTo(0, 0);
     }
   };
 
   const undo = async () => {
     if (!desktop || !report) return;
     const outcomes = await desktop.restore(report.moves.map(({ from, to }) => ({ from, to })));
-    const back = new Set(report.moves.filter((m) => outcomes.some((o) => o.ok && o.path === m.to)).map((m) => m.key));
-    setGone((g) => new Set([...g].filter((k) => !back.has(k))));
-    setReport({ ...report, moves: [], undone: back.size });
+    const back = report.moves.filter((m) => outcomes.some((o) => o.ok && o.path === m.to));
+    const keys = new Set(back.map((m) => m.key));
+    setGone((g) => new Set([...g].filter((k) => !keys.has(k))));
+    if (back.length) {
+      const size = back.reduce((s, m) => s + m.size, 0);
+      countRemoved(report.fn, back.length, size, back.filter((m) => m.exact).length, -1);
+    }
+    setReport({ ...report, moves: [], undone: back.length });
   };
 
   const skipped = result.unreadable + result.unsupported + result.videos;
-  const marksOf = (g: Group) => g.members.map((i) => marks.get(photos[i].key));
+
+  const reportBox = report && <RemoveReport report={report} onUndo={undo} onClose={() => setReport(null)} />;
+  const toReset = resetting ? FNS.map(choicesOf) : [];
 
   return (
     <section className="results">
-      <div className="tiles">
-        <div className="tile">
-          <strong>{num(photos.length - gone.size)}</strong>
-          <span>{T.results.analyzed}</span>
-        </div>
-        <div className="tile">
-          <strong>{num(visible.length)}</strong>
-          <span>{T.results.groups}</span>
-        </div>
-        <div className="tile">
-          <strong>{num(extra)}</strong>
-          <span>{isJunk ? T.results.junkExtra : T.results.extra}</span>
-        </div>
-        <div className="tile">
-          <strong>{bytes(wasted)}</strong>
-          <span>{T.results.space}</span>
-        </div>
+      <div className="space-head">
+        <h2 className="fn-switch">
+          {FNS.map((f) => (
+            <button key={f} className={f === space ? `toggle on fn-${f}` : 'toggle'} aria-current={f === space ? 'page' : undefined} onClick={() => openSpace(f)}>
+              {f === 'dup' ? T.home.dup : T.home.junk} <span className="n">{num(totals(f, groups[f].shown).extra)}</span>
+            </button>
+          ))}
+        </h2>
+        <span className="spacer" />
+        {canRescan && onRescan && (
+          <button className="secondary" onClick={onRescan}>
+            {T.results.rescan}
+          </button>
+        )}
+        <button className="secondary" onClick={onAnother}>
+          {T.results.another}
+        </button>
+        {(hasChoices('dup') || hasChoices('junk')) && (
+          <button className="secondary" onClick={() => setResetting(true)}>
+            {T.reset.button}
+          </button>
+        )}
       </div>
-
-      {report && <RemoveReport report={report} onUndo={undo} onClose={() => setReport(null)} />}
-
-      {(visible.length > 0 || pending.remove.length > 0) && (
-        <div className="sort-bar">
-          <span className="sort-status">
-            <span data-testid="sort-progress">{T.sort.progress(sortedCount, visible.length)}</span>
-            <span className="meter" aria-hidden="true">
-              <span style={{ width: `${visible.length ? (100 * sortedCount) / visible.length : 100}%` }} />
-            </span>
-          </span>
-          {visible.length > 0 && (
-            <button className="primary" onClick={() => startSorting(visible)}>
-              {sortedCount ? T.sort.resume : isJunk ? T.sort.startJunk : T.sort.start}
-            </button>
-          )}
-          {pending.remove.length > 0 && (
-            <button className="primary danger" onClick={() => setRemoving(true)}>
-              {T.sort.removeN(pending.remove.length, bytes(pending.bytes))}
-            </button>
-          )}
-        </div>
-      )}
-
-      <p className="muted small">
-        {T.results.elapsed(duration(result.seconds), result.analyzed)}
+      <p className="muted small scan-info">
+        <strong data-testid="analyzed">{T.home.analyzed(num(photos.length - gone.size))}</strong> {T.results.elapsed(duration(result.seconds), result.analyzed)}
         {skipped > 0 && <> {T.results.skipped(result.unreadable, result.unsupported, result.videos)}</>}
         {result.device && <> {T.results.device(result.device === 'webgpu')}</>}
         {result.clipDevice && <> {T.results.clipDevice(result.clipDevice === 'webgpu')}</>}
@@ -298,85 +376,48 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
           {T.results.clipError}
         </p>
       )}
+      <Space
+        key={space}
+        fn={space}
+        groups={groups[space].shown}
+        ignored={groups[space].ignored}
+        photos={photos}
+        files={result.files}
+        marks={marks[space]}
+        pending={pending[space]}
+        settings={
+          space === 'junk' ? (
+            <JunkSettings params={junkParams} onChange={setJunkParams} hasModel={hasModel} />
+          ) : (
+            <SettingsPanel params={params} onChange={setParams} onReset={() => setParams({ ...DEFAULTS })} />
+          )
+        }
+        report={report?.fn === space ? reportBox : null}
+        onSave={(group, choice) => saveChoice(space, group, choice)}
+        onIgnore={ignore}
+        onRestore={(group) => restoreGroup(space, group)}
+        onRemove={(exact) => setRemoving({ fn: space, exact: exact ?? null })}
+      />
 
-      <div className="actions-row">
-        {canRescan && onRescan && (
-          <button className="secondary" onClick={onRescan}>
-            {T.results.rescan}
-          </button>
-        )}
-        <button className="secondary" onClick={onAnother}>
-          {T.results.another}
-        </button>
-      </div>
-
-      {isJunk ? (
-        <JunkSettings params={junkParams} onChange={setJunkParams} hasModel={hasModel} />
-      ) : (
-        <SettingsPanel params={params} onChange={setParams} onReset={() => setParams({ ...DEFAULTS })} />
-      )}
-      {verdicts.length > 0 && <p className="muted small">{T.results.verified(good, wrong)}</p>}
-
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'all'} onClick={() => (setTab('all'), setShown(PAGE))}>
-          {T.results.all} <span className="n">{num(groups.length)}</span>
-        </button>
-        {KINDS.map((k) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => (setTab(k), setShown(PAGE))}>
-            {T.results.kinds[k]} <span className="n">{num(counts[k])}</span>
-          </button>
-        ))}
-      </div>
-      {tab !== 'all' && <p className="muted small">{T.results.kindHelp[tab]}</p>}
-
-      {visible.length === 0 ? (
-        <p className="empty">{T.results.none}</p>
-      ) : (
-        <div className="groups">
-          {visible.slice(0, shown).map((g, i) => (
-            <GroupCard
-              key={g.id}
-              group={g}
-              photos={photos}
-              verdict={labels.get(g.id)?.verdict}
-              marks={marksOf(g)}
-              onVerdict={(v) => label(g, v)}
-              onOpen={(index) => setViewing({ group: g, index })}
-              onSort={() => startSorting(visible, i)}
-            />
-          ))}
-          {visible.length > shown && (
-            <button className="secondary more" onClick={() => setShown(shown + PAGE)}>
-              {T.results.more}
-            </button>
-          )}
-        </div>
-      )}
-
-      {viewing && <Viewer group={viewing.group} start={viewing.index} photos={photos} files={result.files} onClose={() => setViewing(null)} />}
-      {sorting && (
-        <Sorter
-          groups={sorting.groups}
-          start={sorting.start}
-          photos={photos}
-          files={result.files}
-          marks={marks}
-          pending={pending}
-          onSave={saveChoice}
-          onRemove={() => (setSorting(null), setRemoving(true))}
-          onClose={() => setSorting(null)}
-        />
-      )}
       {removing && (
         <RemoveDialog
-          pending={pending}
+          pending={removing.exact ?? pending[removing.fn]}
+          exact={!!removing.exact}
           photos={photos}
           root={root}
           settings={removeSettings}
           onSettings={setRemoveSettings}
           working={working}
-          onCancel={() => setRemoving(false)}
+          onCancel={() => setRemoving(null)}
           onConfirm={remove}
+        />
+      )}
+      {resetting && (
+        <ResetDialog
+          sorted={toReset.reduce((s, c) => s + c.keys.length, 0)}
+          ignored={toReset.reduce((s, c) => s + c.rows.length, 0)}
+          onCancel={() => setResetting(false)}
+          onConfirm={reset}
         />
       )}
     </section>

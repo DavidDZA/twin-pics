@@ -85,6 +85,18 @@ export const CHAIN_SLACK = 0.05;
 
 const MINUTE = 60_000;
 
+/** Contraste (écart type des niveaux de gris) en dessous duquel une photo est presque vide (`junk.ts`). */
+export const EMPTY_CONTRAST = 10;
+
+/**
+ * Photo presque vide : noire (prise dans la poche), blanche, unie. Jamais « quasi identique » ni « similaire » : le
+ * bruit d'une photo noire donne une empreinte au hasard (31 bits sur 64, à 6 bits d'un ciel bleu sur les photos de
+ * l'utilisateur), que seul le contraste trahit.
+ */
+export function isFlat(p: { dhash?: string; quality?: Quality }): boolean {
+  return (!!p.dhash && isUniformHash(p.dhash)) || (!!p.quality && p.quality.contrast < EMPTY_CONTRAST);
+}
+
 /** Toutes les paires candidates, avec les seuils les plus larges (`LIMITS`). */
 export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] {
   const pairs: Pair[] = [];
@@ -102,7 +114,7 @@ export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] 
   // Quasi identiques : toutes les empreintes comparées deux à deux (64 bits, très rapide).
   const idx: number[] = [];
   photos.forEach((p, i) => {
-    if (p.dhash && !isUniformHash(p.dhash)) idx.push(i);
+    if (p.dhash && !isFlat(p)) idx.push(i);
   });
   const hi = new Uint32Array(idx.length);
   const lo = new Uint32Array(idx.length);
@@ -121,7 +133,7 @@ export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] 
   // elles vont dans les photos inutiles.
   const timed = photos
     .map((_, i) => i)
-    .filter((i) => photos[i].time !== undefined && photos[i].emb && !(photos[i].dhash && isUniformHash(photos[i].dhash!)))
+    .filter((i) => photos[i].time !== undefined && photos[i].emb && !isFlat(photos[i]))
     .sort((i, j) => photos[i].time! - photos[j].time!);
   const window = limits.windowMin * MINUTE;
   for (let k = 0; k < timed.length; k++) {

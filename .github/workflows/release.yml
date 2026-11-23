@@ -41,7 +41,22 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: node scripts/portable-nsi.mjs
       - run: npx electron-builder --win portable --publish never
+      - name: Essai de l'exe portable
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          Start-Process "release/Twin Pics $env:VERSION.exe"
+          foreach ($n in 1..60) {
+            Start-Sleep 2
+            $app = Get-Process 'Twin Pics' -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*Twin Pics Portable*' }
+            if ($app) { break }
+          }
+          if (-not $app) { throw 'l’appli ne s’est pas ouverte' }
+          "ouverte : $($app[0].Path)"
+          Stop-Process -Name 'Twin Pics' -Force
       - name: Release
         shell: bash
         env:
@@ -52,5 +67,5 @@ jobs:
           if gh release view "v$VERSION" > /dev/null 2>&1; then
             gh release upload "v$VERSION" "$exe" --clobber
           else
-            gh release create "v$VERSION" "$exe" --title "Twin Pics $VERSION" --notes "Appli PC (Windows), exe portable : rien à installer. Windows peut afficher « Windows a protégé votre ordinateur » (appli non signée) : Informations complémentaires → Exécuter quand même. Construit par GitHub Actions (commit ${GITHUB_SHA::7}). Nouveautés : docs/ROADMAP.md."
+            gh release create "v$VERSION" "$exe" --title "Twin Pics $VERSION" --notes "Appli PC (Windows), exe portable : rien à installer (la première ouverture prend 10 à 35 s, les suivantes sont immédiates). Windows peut afficher « Windows a protégé votre ordinateur » (appli non signée) : Informations complémentaires → Exécuter quand même. Construit par GitHub Actions (commit ${GITHUB_SHA::7}). Nouveautés : docs/ROADMAP.md."
           fi

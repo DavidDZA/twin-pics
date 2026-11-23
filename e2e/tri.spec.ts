@@ -16,7 +16,7 @@ async function analyze(page: Page) {
   if (await box.isChecked()) await box.click();
   await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
-  await expect(page.getByText('photos analysées')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 30_000 });
 }
 
 const sorter = (page: Page) => page.getByRole('dialog', { name: 'Trier les doublons' });
@@ -129,6 +129,57 @@ test('le tri est retenu après une nouvelle analyse', async ({ page }) => {
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 1 groupe sur 2');
   await expect(page.getByRole('button', { name: 'Continuer le tri' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Supprimer 1 photo/ })).toBeVisible();
+});
+
+test('effacer mes choix : tout redevient à trier, rien n’est supprimé', async ({ page }) => {
+  await analyze(page);
+  await expect(page.getByRole('button', { name: /Effacer tous mes choix/ })).toHaveCount(0);
+  await openSorter(page, 'Grille');
+  await sorter(page).getByRole('button', { name: 'Valider ›' }).click();
+  // « Pas des doublons » pendant le tri : le groupe est mis de côté, c'était le dernier.
+  await expect(sorter(page).getByText('Groupe 2 sur 2')).toBeVisible();
+  await sorter(page).getByRole('button', { name: 'Pas des doublons' }).click();
+  await expect(sorter(page).getByText('Tous les groupes sont triés.')).toBeVisible();
+  await sorter(page).getByRole('button', { name: 'Retour aux groupes' }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 1 groupe sur 1');
+  await expect(page.getByRole('button', { name: 'Revoir le tri' })).toBeVisible();
+
+  // Les choix des photos inutiles comptent aussi.
+  await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
+  await page.getByTestId('group').filter({ hasText: 'floue.jpg' }).getByRole('button', { name: 'Pas inutiles' }).click();
+  await page.locator('.fn-switch').getByRole('button', { name: /Doublons/ }).click();
+  await page.getByRole('button', { name: 'Effacer tous mes choix…' }).click();
+  const modal = page.getByRole('dialog', { name: 'Effacer mes choix' });
+  await expect(modal).toContainText('2 photos redeviennent à trier.');
+  await expect(modal).toContainText('2 groupes mis de côté reviennent dans la liste.');
+  await modal.getByRole('button', { name: 'Annuler' }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 1 groupe sur 1');
+  await page.getByRole('button', { name: 'Effacer tous mes choix…' }).click();
+  await modal.getByRole('button', { name: 'Effacer', exact: true }).click();
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
+  await expect(page.getByRole('button', { name: /Supprimer 1 photo/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Effacer tous mes choix/ })).toHaveCount(0);
+  // Retenu après rechargement.
+  await page.getByRole('button', { name: 'Autre dossier' }).click();
+  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
+});
+
+test('toutes les copies exactes en un bouton : récapitulatif sans trier', async ({ page }) => {
+  await analyze(page);
+  // chat - Copie.jpg, et la copie WhatsApp de plage.jpg (dans un groupe quasi identique).
+  await page.getByRole('button', { name: /Supprimer toutes les copies exactes \(2 photos/ }).click();
+  const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
+  await expect(modal.getByTestId('remove-summary')).toContainText('2 photos à supprimer');
+  await expect(modal.getByText('seule l’originale est gardée')).toBeVisible();
+  await modal.getByRole('button', { name: 'Fermer' }).click();
+  // Rien n'a été trié ; un groupe trié à la main n'est plus concerné.
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
+  await openSorter(page, 'Grille');
+  await sorter(page).getByRole('button', { name: 'Tout garder' }).click();
+  await sorter(page).getByRole('button', { name: 'Valider ›' }).click();
+  await sorter(page).getByRole('button', { name: 'Retour aux groupes' }).click();
+  await expect(page.getByRole('button', { name: /Supprimer toutes les copies exactes \(1 photo,/ })).toBeVisible();
 });
 
 test.describe('téléphone en paysage', () => {

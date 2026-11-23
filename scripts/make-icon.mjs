@@ -21,6 +21,7 @@ const render = async (size) => {
 
 mkdirSync('build', { recursive: true });
 writeFileSync('build/icon.png', await render(512));
+
 const pngs = [];
 for (const s of SIZES) pngs.push(await render(s));
 await browser.close();

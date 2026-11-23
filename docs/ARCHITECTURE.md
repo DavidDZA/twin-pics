@@ -1,8 +1,8 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 22/11/2026 (version 0.4 : appli PC en exe,
-> tri en grille ou en duels, suppression après récapitulatif, § 2.1 et § 4 ; habillage, § 2.2 ; **photos inutiles**
-> et mode swipe, § 4.3). Ce qui reste à faire est dans
+> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.7 : **doublons et photos inutiles
+> séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
+> de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
 > choix) est dans `DavidDZA\IDEES-APPLIS.md`, idée 1.
 
@@ -19,30 +19,38 @@ Une seule interface (React), sous trois formes (`src/platform/`) :
   explique que la suppression se fait dans l'appli PC (lien vers les *Releases*).
 - **Android** (Capacitor) : à venir (ROADMAP § 5).
 
-Trois écrans (`App.tsx`) :
+Pas de version Mac ni iPhone (décision du 23/11/2026).
+
+Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
 
 - **Départ** (`StartScreen`) : « Choisir un dossier de photos », « Reprendre « dossier » » (le dernier dossier : son
   chemin dans l'appli PC, son accès File System Access API sur le site), case « Chercher aussi les photos
   similaires » (retenue : `opt-similar`, localStorage). Sur le site, une ligne renvoie vers l'appli PC.
 - **Analyse** (`ScanScreen`) : étape en cours, barre de progression, temps restant estimé, « Arrêter ».
-- **Résultats** (`Results`) : 4 cases (photos analysées, groupes, photos en trop, place récupérable), barre de tri
-  (« Triés : n groupes sur N », « Trier les doublons » / « Continuer le tri », « Supprimer n photos (taille)… »),
-  compte rendu de la dernière suppression, ce qui n'a pas été analysé, réglages de la détection (`SettingsPanel`,
-  curseurs, retenus : `detect-params`), onglets par niveau, groupes (`GroupCard`, 30 puis « Voir plus » : état du tri
-  photo par photo, « Trier ce groupe » / « Modifier le tri », « Bien trouvé » / « Pas des doublons »), visionneuse
-  (`Viewer` : le fichier d'origine en plein écran ; pour passer aux autres photos du groupe, grandes flèches à gauche
-  et à droite de la photo, flèches du clavier ou glisser le doigt ; Échap ferme ; pendant le tri, le choix « Gardée » /
-  « À supprimer » de la photo).
-- Par-dessus les résultats : l'**écran de tri** (`Sorter`, plein écran) et la fenêtre **« Avant de supprimer »**
-  (`RemoveDialog`), § 4.
+  « Téléchargement du modèle » ne s'affiche que s'il est vraiment téléchargé, sinon « Préparation du modèle ».
+- **Résultats** (`Results`), **une seule page** (0.7). Une barre en haut : **« Doublons | Photos inutiles »** (nombre de
+  photos ; un clic passe de l'une à l'autre, la dernière ouverte est retenue : `last-function`), « Relancer », « Autre
+  dossier », « Effacer tous mes choix… » (s'il y en a) ; puis une ligne : photos analysées, durée, ce qui n'a pas été
+  analysé, où ont tourné les modèles. En dessous, la fonction choisie (`Space`) : 3 cases, la barre de tri (« Trier… »,
+  « Continuer le tri », « Revoir le tri » ; « Supprimer n photos… »), ses réglages (`SettingsPanel` ou `JunkSettings`,
+  retenus : `detect-params`, `junk-params`), ses groupes (`GroupCard`, 30 puis « Voir plus » : état du tri photo par photo,
+  « Trier ce groupe », « Pas des doublons » / « Pas inutiles ») et ses « Groupes mis de côté ». Les doublons ont en plus
+  les onglets par niveau et « Supprimer toutes les copies exactes… ». Deux fonctions séparées depuis la 0.5 (« on se perd
+  un peu ») ; la page intermédiaire à deux cartes et son « Retour » (0.5 et 0.6) ont été retirés à la demande de
+  l'utilisateur.
+  **Rien n'est partagé entre les deux** : choix (`marks`, `junkMarks`), groupes mis de côté, suppression. Une photo
+  inutile qui a aussi un double apparaît dans les deux ; supprimée d'un côté, elle disparaît de l'autre.
+- Par-dessus : l'**écran de tri** (`Sorter`, plein écran), la **visionneuse** (`Viewer`, § 4.5), les fenêtres **« Avant de
+  supprimer »** (`RemoveDialog`), « Effacer tous mes choix » (`ResetDialog`), « Stats et badges » (`StatsDialog`), et les petits
+  messages (`Toasts`, `notify.ts` : badge gagné, groupe mis de côté avec « Annuler »).
 
 ## 2. Technique
 
 | Élément | Choix |
 |---|---|
-| Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil), `src/sort.css` (tri, suppression), `src/theme.css` (habillage, § 2.2) |
+| Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil), `src/sort.css` (tri, suppression), `src/junk.css` (swipe), `src/space.css` (deux cartes, stats), `src/theme.css` (habillage, § 2.2) |
 | Appli PC | **Electron** 45 (`electron/`, construit par esbuild), exe portable par **electron-builder** (`npm run dist`, workflow `release.yml`) : § 2.1 |
-| Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta`, `marks` |
+| Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta`, `marks`, `junkMarks` |
 | Lecture du dossier | Appli PC : le processus principal liste le dossier (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
 | Analyse | fichiers lus par la page (2 à la fois), analysés dans des workers (`analyze.worker.ts`), un par cœur moins un (6 au plus) ; EXIF par **exifr** |
 | Photos similaires | **Transformers.js** + ONNX Runtime Web, modèle `onnx-community/dinov2-small` : carte graphique (WebGPU, `fp16`, 44 Mo), sinon processeur (WebAssembly, `q8`, 24 Mo) |
@@ -61,7 +69,10 @@ src/
   lib/
     files.ts           une photo trouvée (FoundFile), lecture du dossier sur le site
     filetypes.ts       types de fichiers, dossiers ignorés (partagé avec electron/)
-    choices.ts         le tri : garder / supprimer, photos à supprimer, duels (code pur)
+    choices.ts         le tri : garder / supprimer, photos à supprimer, copies exactes d'un coup, duels (code pur)
+    ignored.ts         groupes mis de côté (« Pas des doublons », « Pas inutiles ») (code pur)
+    stats.ts           stats et badges (code pur) ; statsStore.ts : leur enregistrement ; notify.ts : messages
+    zoom.ts            zoom de la visionneuse : molette, clavier, deux doigts (code pur)
     quality.ts         netteté de la zone la plus nette, luminosité, contraste (code pur)
     junk.ts            photos inutiles : raisons, scores MobileCLIP, groupes (code pur) ; junkPrompts.json
     clip.worker.ts     MobileCLIP (vecteur de 512 nombres par photo)
@@ -74,12 +85,13 @@ src/
     imagehash.ts       dHash, Hamming, netteté, cosinus : code pur, testé sous Node
     groups.ts          paires candidates, groupes, suggestion : code pur
     db.ts model.ts messages.ts
-  components/        écrans et briques (GroupCard, Sorter, RemoveDialog, SettingsPanel, Viewer, PhotoImage…)
+  components/        écrans et briques (Results, Space, GroupCard, Sorter, SwipeSorter, RemoveDialog, Viewer, StatsDialog…)
   i18n/              un dictionnaire par langue (fr.ts en référence)
 tests/  e2e/  e2e-pc/  Vitest, Playwright site, Playwright appli PC (e2e/photos.ts génère le dossier d'essai)
 scripts/             construction et lancement de l'appli PC, icône (build/icon.ico, depuis public/favicon.svg)
 tools/vitesse/       banc de mesure de vitesse (décodage, modèle sur processeur ou carte graphique), § 3.5
 tools/inutiles/      phrases de MobileCLIP et calibrage des photos inutiles sur un dossier, § 4.3
+tools/doublons/      paires quasi identiques d'un dossier, retenues ou refusées, § 3.3
 ```
 
 ### 2.1 Appli PC (Electron)
@@ -98,6 +110,19 @@ Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disq
 - **Pont** (`preload.ts`, `contextIsolation`, `sandbox`) : `window.twinPics` = choisir un dossier, dernier dossier
   (`reglages.json` dans le dossier de l'appli), lister, choisir le dossier « À supprimer », supprimer, annuler, ouvrir
   l'Explorateur, ouvrir un lien. Les liens `target="_blank"` s'ouvrent dans le navigateur.
+- **Ouverture** (23/11/2026, l'utilisateur trouvait l'appli lente à s'ouvrir ; mesures sur son PC) : le portable
+  d'electron-builder se décompresse à chaque lancement (≈ 300 Mo, vérifiés par l'antivirus), sans rien montrer : **34 à
+  36 s** la première fois, 9 s ensuite ; l'appli elle-même s'ouvre en 0,5 s (5 s la toute première fois).
+  Depuis la 0.6, **notre script d'exe portable** (`build/portable.nsi`, mis à la place du modèle d'electron-builder par
+  `scripts/portable-nsi.mjs` dans `npm run dist` et `release.yml`) : fenêtre avec **barre de progression** et texte dans la
+  langue de Windows, et appli décompressée **gardée** dans `%LOCALAPPDATA%\Twin Pics Portable\<construction>` (dossier
+  d'attente renommé à la fin ; constructions précédentes effacées). Mesuré : barre à 0,6 s, appli à 8 à 11 s la première
+  fois, **0,4 s ensuite**. Le modèle, lui, décompressait puis copiait tout une seconde fois.
+  Dans la page, **barre d'ouverture** (`index.html`, sans code) jusqu'à ce que l'appli la remplace, sur le fond de la
+  fenêtre (`backgroundColor` : pas d'éclair blanc).
+- **Pas d'installateur** : il y en a eu un en 0.5 et 0.6, pour contourner la lenteur du portable ; inutile depuis que
+  celui-ci s'ouvre tout de suite (décision de l'utilisateur, 23/11), et l'utilisateur ne comprenait pas où il installait.
+  `release.yml` ouvre l'exe portable pour l'essayer avant de publier.
 - **Une seule fenêtre** (`requestSingleInstanceLock`) : deux appli ouvertes se disputeraient la base locale.
 - **Paquet** : toutes les dépendances sont des `devDependencies` (l'interface est empaquetée par Vite) : l'exe
   n'embarque aucun `node_modules` (≈ 110 Mo, Electron compris).
@@ -110,7 +135,7 @@ Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disq
 Demandé le 22/11/2026 : « un peu plus fun ». Chargé en dernier, il ne change que l'apparence : les couleurs du logo
 (bleu `--brand-a`, orange `--brand-b`) en dégradé (`--brand`) pour les boutons principaux, les onglets choisis, les
 titres et les chiffres ; deux halos de couleur en fond ; boutons arrondis qui réagissent au survol et au clic ; cartes
-douces avec ombre ; un emoji décoratif par case de chiffres (📸 👯 🗂️ 💾, ignorés par les lecteurs d'écran) ;
+douces avec ombre ; un emoji décoratif par case de chiffres (👯 🗂️ 💾, ignorés par les lecteurs d'écran) ;
 **logo animé** (`TwinCards` : deux photos jumelles qui se rejoignent au départ, se mélangent pendant l'analyse) ;
 barre de progression du tri ; « VS » entre les deux photos d'un duel ; 🎉 à la fin du tri et après une suppression.
 Toutes les animations s'arrêtent si le système demande moins de mouvement (`prefers-reduced-motion`).
@@ -135,8 +160,12 @@ MobileCLIP (photos inutiles, `clip.worker.ts`). Ils reçoivent la même petite v
    n'est pas réanalysée. Relancer l'analyse d'un dossier déjà vu prend quelques secondes. Exception : une photo
    mesurée avec une autre version des mesures de qualité (`qv` ≠ `QUALITY_VERSION`) est réanalysée — la première
    analyse en version 0.4 relit donc une fois toutes les photos analysées avant.
-3. **Le modèle se charge** (photos similaires cochées) pendant que l'analyse commence. S'il n'est pas prêt à la fin de
-   l'analyse (premier téléchargement), la progression montre son téléchargement.
+3. **Les modèles se chargent** pendant que l'analyse commence, **seulement s'il y a des photos à leur montrer** : la
+   version utilisée la dernière fois (meta `models`) suffit à savoir que toutes les photos ont déjà leur vecteur.
+   Relancer un dossier déjà vu ne charge donc aucun modèle (1 493 photos : 0,5 s, au lieu de 10 à 20 s de préparation
+   des modèles). Si un modèle n'est pas prêt à la fin de l'analyse, la progression montre son téléchargement, ou
+   « Préparation du modèle » s'il est déjà sur l'appareil (`modelCached` regarde le cache de Transformers.js). Jusqu'à la
+   0.4, elle disait « Téléchargement » dans les deux cas : les modèles n'étaient pourtant téléchargés qu'une fois.
 4. **Lecture** : la page lit le fichier (`file.arrayBuffer()`), **2 à la fois au plus** (`READS_AT_ONCE` : un disque
    dur ralentit s'il saute d'un fichier à l'autre), et le transfère au worker (sans copie). Au plus « workers + 4 »
    photos en mémoire à la fois.
@@ -205,11 +234,14 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
 - **Suggestion** (`suggestBest`) : copies exactes → l'originale (pas dans un dossier WhatsApp, Telegram,
   téléchargements, pas de « (1) » ni « Copie » dans le nom ; puis la plus ancienne, puis le chemin le plus court) ;
   quasi identiques → la plus grande définition, puis le plus gros fichier ; similaires → la plus nette.
-- Les images presque uniformes (dHash ≤ 4 ou ≥ 60 bits à 1 : photos noires…) ne sont jamais « quasi identiques »
-  ni « similaires » (le modèle les juge pareilles, mais ce ne sont pas des doublons à départager) : elles vont dans
-  les photos inutiles (§ 4.3).
+- Les photos **presque vides** (`isFlat` : dHash ≤ 4 ou ≥ 60 bits à 1, ou **contraste < 10**) ne sont jamais « quasi
+  identiques » ni « similaires » (le modèle les juge pareilles, mais ce ne sont pas des doublons à départager) : elles
+  vont dans les photos inutiles (§ 4.3). Le contraste a été ajouté le 23/11/2026 : les photos noires de l'utilisateur
+  (une poche, à Cuba) ont une empreinte faite de bruit (31 bits à 1 sur 64, donc pas « uniforme »), à 6 ou 7 bits d'un
+  ciel bleu de Croatie : 25 photos noires se retrouvaient en double d'une photo de mer. Vérifié sur ses 1 493 photos
+  (`node tools/doublons/empreintes.mjs`) : seules ces paires sont refusées, 103 groupes de doublons, aucune photo noire.
 - Groupes triés par date ; dans un groupe, la suggestion d'abord, puis par date. Identifiant stable (`groupId`) :
-  empreinte des clés des photos, pour retrouver les réponses « Bien trouvé » / « Pas des doublons ».
+  empreinte des clés des photos, pour retrouver les groupes mis de côté.
 - Sous chaque photo, sa ressemblance avec la suggestion : « identique », « n bits d'écart » ou « ressemble à n % ».
 
 ### 3.4 Base locale (`db.ts`)
@@ -217,11 +249,14 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
 - `photos` : une ligne par fichier (clé, chemin, taille, date de modification, SHA-256, dHash, netteté, dimensions,
   date EXIF, appareil, erreur, vecteur et nom du modèle).
 - `thumbs` : miniatures (≈ 10 Ko chacune ; à surveiller pour 50 000 photos : ROADMAP).
-- `labels` : réponses sur les groupes (`groupId`, verdict `good` / `wrong`, nature, clés des photos, réglages du moment).
-- `meta` : `folder` (site : accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre »).
+- `labels` : groupes mis de côté (`groupId`, verdict `wrong`, nature, clés des photos), § 4.4. Les anciens verdicts
+  `good` (« Bien trouvé », jusqu'à la 0.4, sans effet) sont ignorés.
+- `meta` : `folder` (site : accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre ») ;
+  `models` (versions des modèles), `stats` (§ 4.6).
 - `photos` porte aussi, depuis la version 0.4 : `quality` et `qv` (mesures de qualité et leur version), `clip` et
   `clipModel` (vecteur MobileCLIP et sa version, `clipId(dtype)`).
-- `marks` (version 2 de la base) : le tri, photo par photo (`key`, `mark` = `keep` / `remove`, `groupId`, date), § 4.
+- `marks` (version 2 de la base, doublons) et `junkMarks` (version 3, photos inutiles : copiées des `marks` des groupes
+  « j… ») : le tri, photo par photo (`key`, `mark` = `keep` / `remove`, `groupId`, date), § 4.
 
 ### 3.5 Vitesse (21/11/2026)
 
@@ -276,8 +311,13 @@ supprimer ; les suppressions faites à la fin, en une fois.
 
 ### 4.2 La suppression (`RemoveDialog`, `electron/remove.ts`)
 
-- **Ce qui est supprimé** (`pendingRemoval`) : les photos « à supprimer » des groupes **triés** du moment. Une photo
+- **Ce qui est supprimé** (`pendingRemoval`) : les photos « à supprimer » des groupes **triés** du moment, de la fonction
+  ouverte seulement ; pour les photos inutiles, chaque photo jetée compte, même si son groupe n'est pas fini (et l'absence
+  de photo gardée n'est pas signalée : c'est le but). Une photo
   marquée qui n'est plus dans aucun groupe (réglages changés) n'est jamais touchée.
+- **Toutes les copies exactes** (`exactCleanup`, bouton de la page des doublons) : dans chaque groupe proposé (même
+  quasi identique ou similaire), les fichiers identiques octet pour octet sauf un (la suggestion si elle en fait partie,
+  sinon l'originale), sans les trier. Des copies déjà triées à la main ne sont pas concernées. Même récapitulatif.
 - **« Avant de supprimer »** : « n photos à supprimer (taille), n gardées, dans n groupes », avertissement si des
   groupes ne gardent aucune photo, la liste des groupes (miniatures « Gardée » / « À supprimer », noms au clic ; 60
   groupes puis « et n autres groupes »), **« Où vont les photos supprimées »** (liste : Corbeille de Windows ou
@@ -324,21 +364,52 @@ place des duels.
   un gaufrier…), à corriger par l'utilisateur ou le curseur « certitude ». Netteté des photos : 1 % sous 3,3, 5 % sous
   350, médiane 4 200. Outils : `calibrer.mjs [dossier] [nombre]` (répartitions, photos retenues par raison,
   `test-results/calibrage.json`) et `planche.mjs <raison>` (planche contact).
-- **Groupes** (`buildJunkGroups`) : parmi les photos inutiles qui ne sont dans aucun groupe de doublons, deux photos
+- **Groupes** (`buildJunkGroups`) : parmi les photos inutiles (celles des doublons comprises depuis la 0.5), deux photos
   qui partagent une raison sont reliées si MobileCLIP les juge proches (`groupMin`, 85 %), si leurs dHash sont à 6 bits
   au plus, ou si elles sont toutes deux presque vides ; même garde-fou contre les chaînes que les similaires ;
   **aucune limite de temps**. Plus gros groupes d'abord. Identifiant `j…`, pas de suggestion (`best` = −1), raisons par
   photo et raison principale (`junk`). Au-delà de 4 000 photos inutiles, pas de regroupement par le modèle (à mesurer).
-- **Interface** : onglet « Inutiles » (sa case « photos inutiles », ses réglages `JunkSettings` : raisons à cocher,
+- **Interface** : sa page (§ 1 ; réglages `JunkSettings` : raisons à cocher,
   curseurs netteté, certitude du modèle, ressemblance pour regrouper ; retenus : `junk-params`), cartes avec la raison
-  principale et les raisons de chaque photo, « Bien trouvé » / « Pas inutiles ». Option de la page de départ
+  principale et les raisons de chaque photo, « Pas inutiles ». Option de la page de départ
   « Reconnaître aussi les documents, tickets et mèmes » (`opt-junk-model`, cochée par défaut).
-- **Tri** : par défaut, **tout le groupe à jeter** (pas de suggestion). « Affichage : Grille | Swipe » (retenu à part :
-  `junk-view` ; swipe par défaut au téléphone). **Swipe** (`SwipeCard`) : une carte (une photo, ou une mosaïque de 4
-  avec « +n » pour un groupe : « n photos semblables », raisons, taille, date), glissée à la souris ou au doigt
-  (au-delà de 110 px ; tampons « Je garde » / « Je jette » qui apparaissent avec le geste), boutons « ✕ Je jette » /
-  « ✓ Je garde », flèches ← → ; la décision vaut pour tout le groupe et passe au suivant. La grille reste là pour
-  garder une partie d'un groupe.
+- **Tri** : « Affichage : Grille | Swipe » (retenu à part : `junk-view` ; swipe par défaut au téléphone). **Grille** : tout
+  le groupe, à jeter par défaut (pas de suggestion). **Swipe** (`SwipeSorter`, `SwipeCard`) : **une photo à la fois**
+  (demandé le 23/11/2026 ; jusqu'à la 0.4, une carte pour tout un groupe), dans l'ordre des groupes ; nom, raisons,
+  taille, date ; la suivante est déjà visible sous la carte. Glissée à la souris ou au doigt (au-delà de 110 px ; tampons
+  « Je garde » / « Je jette » qui apparaissent avec le geste), boutons, flèches ← → ; « Précédent » revient (le choix est
+  montré et se change), « Passer » ne décide rien. **Pas de résumé à la fin** : après la dernière photo, retour à la liste.
+
+### 4.4 Groupes mis de côté, effacer les choix (`ignored.ts`, 23/11/2026)
+
+- **« Pas des doublons » / « Pas inutiles »** (carte du groupe, et pendant le tri) : le groupe n'est plus proposé, ni
+  trié, ni supprimé ; message avec « Annuler », puis « Groupes mis de côté (n) » en bas de la page, « Remettre dans la
+  liste ». Jusqu'à la 0.4, ces boutons (et « Bien trouvé », retiré) ne servaient qu'à noter la détection.
+- Doublons : un groupe est caché si toutes ses photos étaient dans un même groupe mis de côté (il reste caché s'il
+  rétrécit, il revient s'il gagne une photo : c'est peut-être un vrai double). Photos inutiles : photo par photo.
+- **« Effacer tous mes choix… »** (barre du haut ; les deux fonctions ensemble, un bouton par fonction jusqu'à la 0.6) : après
+  confirmation, les photos triées **du dossier analysé** redeviennent à trier et ses groupes mis de côté reviennent.
+  Aucun fichier touché ; les stats restent.
+
+### 4.5 Zoom (`zoom.ts`, `Viewer`, 23/11/2026)
+
+Dans la visionneuse : **molette** (le point sous la souris ne bouge pas), touches **+ − 0**, double clic (250 %), boutons
+− / + / « Photo entière », **deux doigts** sur un écran tactile (déjà prêt pour Android, événements « pointer »). La photo
+agrandie se déplace à la souris ou au doigt, sans sortir de l'écran ; 100 % = photo entière, 1 200 % au plus. **Le zoom est
+gardé en passant à la photo suivante** : on compare le même détail sur deux photos presque pareilles.
+
+### 4.6 Stats et badges (`stats.ts`, `statsStore.ts`, `StatsDialog`, 23/11/2026)
+
+- **Compteurs** en base (meta `stats`) : analyses, dossiers différents, plus grosse analyse ; photos triées (première
+  décision seulement), gardées, la nuit (0 h à 5 h), âge de la plus ancienne (dates d'avant 1990 ignorées) ; groupes de
+  doublons triés, gardés ou supprimés en entier, le plus gros ; duels, swipes, record en une minute ; photos supprimées par
+  fonction (dont copies exactes), record d'un coup, suppressions, photos remises ; place libérée ; jours d'utilisation ;
+  listes finies ; groupes mis de côté ; photos regardées en zoom. Les records ne baissent pas (`atLeast`), « Annuler » une
+  suppression décompte.
+- **Cinquante badges** (demandés par l'utilisateur ; `BADGES` : un compteur, un seuil), en 7 familles, un nom et un emoji
+  chacun. Gagné = pour de bon (meta `badges` : sa date), même si le compteur redescend. Annoncé par un message (un seul
+  s'il y en a plus de deux d'un coup). La 0.5 avait 8 badges à trois niveaux : ceux déjà mérités sont redonnés.
+- Rien n'est envoyé. Ajouter un badge : une ligne dans `BADGES`, son nom dans les 6 langues (le test le vérifie).
 
 ## 5. Traduction
 
@@ -358,10 +429,14 @@ durées par `Intl` (`bytes`, `duration`).
   réglage, images uniformes écartées, similaires selon la ressemblance et l'écart de temps, garde-fou contre les
   chaînes, photos sans date jamais similaires, ordre et identifiant des groupes, photos qui ont besoin du modèle) ;
   traductions (dont : le dossier « À supprimer » n'est jamais analysé, dans toutes les langues).
+- **Version 0.5** : `ignored.test.ts` (groupes mis de côté : rétréci, agrandi, deux fonctions à part), `stats.test.ts`
+  (50 badges différents et traduits, seuils, gardés après une annulation, annonce une seule fois, compteurs et records), `zoom.test.ts` (point fixe, bornes, deux doigts),
+  `db.test.ts` (base de la 0.4 reprise), `groups.test.ts` (photos noires au bruit trompeur), `choices.test.ts` (copies
+  exactes d'un coup).
 - **Photos inutiles** (`junk.test.ts`) : mesures sur des images générées (nette, floue partout, sujet net sur fond
   flou, sombre, brûlée, vide), chaque règle, captures par le nom ou les proportions, certitude du modèle, « prise par
   erreur » seulement si ratée, raisons décochées, phrases livrées (normalisées, toutes les catégories), groupes sans
-  limite de temps, raisons différentes jamais ensemble, photos de doublons à part, garde-fou contre les chaînes,
+  limite de temps, raisons différentes jamais ensemble, photos à laisser de côté, photo décidée seule, garde-fou contre les chaînes,
   regroupement par dHash sans le modèle, tout à jeter par défaut. Images uniformes jamais « similaires »
   (`groups.test.ts`).
 - **Tri** (`choices.test.ts`) : suggestion seule par défaut, en garder plusieurs ou aucune, groupe trié ou non, choix
@@ -376,7 +451,8 @@ durées par `Intl` (`bytes`, `duration`).
 - **Playwright** (`npm run e2e`) : dossier d'essai généré (`e2e/photos.ts` : copies exactes, copie WhatsApp, version
   réduite, rafale floue, photo cassée, HEIC, vidéo), lu par le champ `webkitdirectory` (la fenêtre de choix de dossier
   ne s'automatise pas). Parcours : écran de départ, groupes trouvés et suggestions, photos non analysées, curseurs,
-  « Bien trouvé » retenu et seconde analyse sans rien refaire, visionneuse, miniatures, pas de défilement horizontal,
+  barre du haut sans page intermédiaire, « Pas des doublons » (annuler, retenu, remettre), seconde analyse sans rien refaire, visionneuse (zoom à la
+  molette, au clavier, au double clic, à deux doigts, gardé d'une photo à l'autre), stats et badges (badge gagné et daté), un clic d'une fonction à l'autre (retenue), barre d'ouverture, miniatures, pas de défilement horizontal,
   anglais. Avec `E2E_MODELE=1` (télécharge le modèle) : rafale trouvée pendant l'analyse, la plus nette proposée, et
 où a tourné le modèle affiché ; même chose sur le processeur forcé ; photos similaires demandées après une analyse
 sans elles (photos déjà vues complétées).
@@ -385,17 +461,18 @@ sans elles (photos déjà vues complétées).
 - **Playwright, tri sur le site** (`e2e/tri.spec.ts`, téléphone et PC) : groupe de deux photos directement au résumé
   (en garder deux), deux duels dans un groupe de trois (« VS », la copie gagne), « Plein écran » pendant un duel, fin du tri, fenêtre « Avant de supprimer » sans bouton de suppression mais avec le
   lien vers l'appli PC ; grille (« Tout garder », « Passer », « Revoir les groupes passés », choix changé dans la
-  visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; téléphone : duel l'une sous l'autre en
+  visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; effacer tous mes choix (les deux fonctions) ; toutes les copies exactes ; téléphone : duel l'une sous l'autre en
   portrait, côte à côte en paysage (760 × 393), résumé sans défilement horizontal. Captures dans `test-results/`.
 - **Playwright, photos inutiles** (`e2e/inutiles.spec.ts`, dossier d'essai `Ratées` : deux photos noires, une floue,
-  une sombre, deux captures, une page de texte) : onglet (6 groupes, 7 photos, les noires regroupées, raisons), réglages
-  (décocher « Floue »), swipe (bouton, clavier, geste à la souris, geste trop court sans effet, puis récapitulatif),
+  une sombre, deux captures, une page de texte) : page (6 groupes, 7 photos, les noires regroupées, raisons), réglages
+  (décocher « Floue »), swipe photo par photo (bouton, clavier, geste à la souris, geste trop court sans effet, retour en
+  arrière, reprise, fin sans résumé, revoir le tri), « Pas inutiles »,
   grille (tout à jeter par défaut, plein écran), téléphone (swipe par défaut, carte et boutons à l'écran en portrait et
   en paysage) ; avec `E2E_MODELE=1` : page de texte « Document », photos noires « Prise par erreur », sur la carte
-  graphique et sur le processeur.
+  graphique et sur le processeur ; deuxième analyse sans charger de modèle, modèle relu sans « Téléchargement ».
 - **Playwright, appli PC** (`npm run e2e:pc`, `e2e-pc/appli.spec.ts`, vraie appli Electron, copie du dossier
   d'essai) : photos d'origine lues par `app://`, grille, récapitulatif, Corbeille (dossier d'essai), dossier « À
-  supprimer » (sous-dossiers, ignoré par la nouvelle analyse), annulation, disque sans Corbeille, « Tout supprimer »
+  supprimer » (sous-dossiers, ignoré par la nouvelle analyse), annulation, toutes les copies exactes, disque sans Corbeille, « Tout supprimer »
   et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant, photos inutiles triées en swipe puis à la
   Corbeille ; avec `E2E_MODELE=1`, photos similaires
   sur la carte graphique.

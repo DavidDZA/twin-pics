@@ -1,6 +1,6 @@
 /**
- * Trois écrans : départ (choisir un dossier), analyse (progression), résultats (groupes de doublons, tri,
- * suppression). Même interface sur le site et dans l'appli PC (`platform/`), qui seule supprime des photos.
+ * Trois écrans : départ (choisir un dossier), analyse (progression), résultats (doublons et photos inutiles, deux
+ * fonctions séparées). Stats et badges : bouton en haut. Même interface sur le site et dans l'appli PC (`platform/`), qui seule supprime des photos.
  */
 import { useCallback, useRef, useState } from 'react';
 import { T } from './i18n';
@@ -12,6 +12,9 @@ import { StartScreen } from './components/StartScreen';
 import { ScanScreen } from './components/ScanScreen';
 import { Results } from './components/Results';
 import { Footer } from './components/Footer';
+import { StatsDialog } from './components/StatsDialog';
+import { Toasts } from './components/Toasts';
+import { countScan } from './lib/statsStore';
 
 type Screen = { name: 'start'; error?: string } | { name: 'scan'; progress: Progress | { phase: 'listing'; done: number; total: 0 } } | { name: 'results'; result: ScanResult };
 
@@ -45,6 +48,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'start' });
   const [similar, setSimilarState] = useState(() => readOption(SIMILAR_KEY));
   const [junkModel, setJunkModelState] = useState(() => readOption(JUNK_KEY));
+  const [stats, setStats] = useState(false);
   const source = useRef<Source | null>(null);
   const abort = useRef<AbortController | null>(null);
 
@@ -68,6 +72,7 @@ export default function App() {
         } else listing = listFileList(src.files);
         if (controller.signal.aborted) throw new DOMException('', 'AbortError');
         const result = await scan(listing, { similar, junkModel, signal: controller.signal, onProgress: (progress) => setScreen({ name: 'scan', progress }) });
+        countScan(result.photos.length, src.kind === 'desktop' ? src.root : src.kind === 'handle' ? src.handle.name : (src.files[0]?.webkitRelativePath.split('/')[0] ?? ''));
         setScreen({ name: 'results', result });
       } catch (err) {
         if ((err as Error).name === 'AbortError') setScreen({ name: 'start' });
@@ -111,6 +116,11 @@ export default function App() {
           <img className="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
           Twin Pics
         </h1>
+        {screen.name !== 'scan' && (
+          <button className="secondary" onClick={() => setStats(true)}>
+            {T.stats.title}
+          </button>
+        )}
       </header>
       <main>
         {screen.name === 'start' && (
@@ -138,6 +148,8 @@ export default function App() {
         )}
       </main>
       <Footer />
+      {stats && <StatsDialog onClose={() => setStats(false)} />}
+      <Toasts />
     </div>
   );
 }

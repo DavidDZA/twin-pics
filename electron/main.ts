@@ -10,7 +10,7 @@
  * (réponses des fenêtres de choix de dossier, qui ne s'automatisent pas), TP_FAKE_TRASH (dossier qui remplace la
  * Corbeille), VITE_DEV_URL (interface servie par Vite en développement).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, shell } from 'electron';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -110,6 +110,8 @@ function createWindow(): void {
     minWidth: 360,
     minHeight: 500,
     title: 'Twin Pics',
+    // Même fond que la barre d'ouverture (index.html) : pas d'éclair blanc.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#12131a' : '#f6f7fb',
     icon: join(app.getAppPath(), 'build', 'icon.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true },
   });

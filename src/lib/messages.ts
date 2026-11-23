@@ -51,7 +51,8 @@ export type ModelDevice = 'webgpu' | 'wasm';
 export type EmbedRequest = { type: 'load'; device: 'auto' | 'wasm' } | { type: 'embed'; id: number; pixels: Pixels };
 
 export type EmbedMessage =
-  | { type: 'progress'; loaded: number; total: number }
+  /** `cached` : le modèle est déjà sur l'appareil, rien n'est téléchargé. */
+  | { type: 'progress'; loaded: number; total: number; cached: boolean }
   | { type: 'ready'; device: ModelDevice; dtype: string }
   | { type: 'vector'; id: number; vector: Float32Array }
   | { type: 'failed'; id: number; error: string }

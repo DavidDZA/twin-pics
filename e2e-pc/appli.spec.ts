@@ -49,12 +49,13 @@ test.afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-async function analyze() {
+async function analyze(open: 'doublons' | 'photos inutiles' = 'doublons') {
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if (await box.isChecked()) await box.click();
   await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
-  await expect(page.getByText('photos analysées')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('analyzed')).toHaveText('15 photos analysées.', { timeout: 30_000 });
+  if (open === 'photos inutiles') await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
 }
 
 /** Trie les deux groupes avec la suggestion seule (bouton « Valider »). */
@@ -75,7 +76,6 @@ test('appli PC : analyse, tri en grille, Corbeille', async () => {
   // Pas de message « version d'essai » dans l'appli PC.
   await expect(page.getByText('Version d’essai en ligne')).toHaveCount(0);
   await analyze();
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('15');
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
 
   // Grille : photos en grand (fichier d'origine lu par l'appli), la suggestion gardée, les autres à supprimer.
@@ -111,7 +111,11 @@ test('appli PC : analyse, tri en grille, Corbeille', async () => {
   expect(existsSync(join(photos, 'Animaux', 'chat.jpg'))).toBe(true);
   expect(existsSync(join(photos, 'Vacances', 'plage.jpg'))).toBe(true);
   await expect(page.getByTestId('group')).toHaveCount(0);
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('12');
+  // Stats : 3 photos supprimées.
+  await page.getByRole('button', { name: 'Stats et badges' }).click();
+  await expect(page.locator('.stat-list > div', { hasText: 'photos supprimées' }).locator('dd')).toHaveText('3');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('analyzed')).toHaveText('12 photos analysées.');
 });
 
 test('appli PC : dossier « À supprimer », annulation', async () => {
@@ -134,8 +138,8 @@ test('appli PC : dossier « À supprimer », annulation', async () => {
 
   // Une nouvelle analyse n'y regarde pas : plus aucun groupe.
   await page.getByRole('button', { name: 'Relancer' }).click();
-  await expect(page.getByText('photos analysées')).toBeVisible();
-  await expect(page.locator('.tile', { hasText: 'photos analysées' }).locator('strong')).toHaveText('12');
+  await expect(page.getByText('rien de nouveau')).toBeVisible();
+  await expect(page.getByTestId('analyzed')).toHaveText('12 photos analysées.');
 });
 
 test('appli PC : annuler remet les photos à leur place', async () => {
@@ -153,6 +157,27 @@ test('appli PC : annuler remet les photos à leur place', async () => {
   await expect(page.getByTestId('group')).toHaveCount(2);
 });
 
+test('appli PC : toutes les copies exactes en un bouton, puis annuler', async () => {
+  await launch();
+  await analyze();
+  await page.getByRole('button', { name: /Supprimer toutes les copies exactes \(2 photos/ }).click();
+  const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
+  await modal.getByRole('combobox', { name: 'Où vont les photos supprimées' }).selectOption('folder');
+  await modal.getByRole('button', { name: 'Supprimer 2 photos' }).click();
+  await expect(page.getByTestId('remove-report')).toContainText('2 photos supprimées');
+  expect(existsSync(join(photos, 'Animaux', 'chat - Copie.jpg'))).toBe(false);
+  expect(existsSync(join(photos, 'Animaux', 'chat.jpg'))).toBe(true);
+  expect(existsSync(join(photos, 'WhatsApp Images', 'IMG-20240714-WA0001.jpg'))).toBe(false);
+  expect(existsSync(join(photos, 'Vacances', 'plage.jpg'))).toBe(true);
+  expect(existsSync(join(photos, 'Vacances', 'plage-petite.jpg'))).toBe(true);
+  // Il reste plage.jpg et sa version réduite ; plus de copie exacte.
+  await expect(page.getByTestId('group')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /copies exactes/ })).toHaveCount(0);
+  await page.getByTestId('remove-report').getByRole('button', { name: 'Annuler' }).click();
+  await expect(page.getByTestId('group')).toHaveCount(2);
+  expect(existsSync(join(photos, 'Animaux', 'chat - Copie.jpg'))).toBe(true);
+});
+
 test('appli PC : disque sans Corbeille, rien n’est touché', async () => {
   await launch({ TP_FAKE_TRASH_FAIL: '1' });
   await analyze();
@@ -166,13 +191,14 @@ test('appli PC : disque sans Corbeille, rien n’est touché', async () => {
 
 test('appli PC : photos inutiles triées en swipe, puis à la Corbeille', async () => {
   await launch();
-  await analyze();
-  await page.getByRole('tab', { name: /Inutiles/ }).click();
+  await analyze('photos inutiles');
   await page.getByRole('button', { name: 'Trier les photos inutiles' }).click();
   const sorter = page.getByRole('dialog', { name: 'Trier les photos inutiles' });
   await sorter.getByRole('button', { name: 'Swipe' }).click();
-  // Les deux photos noires d'un coup, puis la floue gardée, la sombre jetée.
-  await expect(sorter.getByText('2 photos semblables')).toBeVisible();
+  // Les deux photos noires, puis la floue gardée, la sombre jetée.
+  await expect(sorter.getByText('noire-1.jpg')).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await expect(sorter.getByText('noire-2.jpg')).toBeVisible();
   await page.keyboard.press('ArrowLeft');
   await expect(sorter.getByText('floue.jpg')).toBeVisible();
   await page.keyboard.press('ArrowRight');
@@ -193,7 +219,7 @@ test('appli PC : photos similaires sur la carte graphique (E2E_MODELE=1 : télé
   test.setTimeout(240_000);
   await launch();
   await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
-  await expect(page.getByText('photos analysées')).toBeVisible({ timeout: 200_000 });
+  await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 200_000 });
   await expect(page.getByText(/Photos similaires calculées par (la carte graphique|le processeur)/)).toBeVisible();
   console.log(await page.getByText(/Photos similaires calculées par/).textContent());
   await page.getByText('Réglages de la détection').click();

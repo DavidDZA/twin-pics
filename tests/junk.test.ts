@@ -119,7 +119,7 @@ describe('groupes de photos inutiles', () => {
     expect(groups[0].wasted).toBe(1000 + 2000 + 3000);
   });
 
-  it('pas de groupe entre deux raisons différentes ; les photos déjà dans un groupe de doublons sont à part', () => {
+  it('pas de groupe entre deux raisons différentes ; les photos à laisser de côté (supprimées, « Pas inutiles ») n’y sont pas', () => {
     const photos = [photo(0, { deg: 0 }), photo(1, { deg: 1 }), photo(2, { deg: 2 })];
     const reasons: JunkReason[][] = [['document'], ['blurry'], ['document']];
     const groups = buildJunkGroups(photos, reasons, params, new Set([2]));
@@ -137,13 +137,23 @@ describe('groupes de photos inutiles', () => {
     expect(buildJunkGroups(noModel, reasons, params, new Set()).map((g) => g.members.length)).toEqual([2, 1]);
   });
 
-  it('tri par défaut : tout le groupe à jeter, signalé dans le récapitulatif', () => {
+  it('chaque photo se décide seule (swipe) : une photo jetée compte même si le reste du groupe n’est pas trié', () => {
+    const photos = [photo(0, { deg: 0 }), photo(1, { deg: 3 }), photo(2, { deg: 5 })];
+    const [g] = buildJunkGroups(photos, [['receipt'], ['receipt'], ['receipt']], params, new Set());
+    expect(g.members).toHaveLength(3);
+    const pending = pendingRemoval([g], photos, new Map([['k0', 'remove'], ['k1', 'keep']]));
+    expect(pending.remove).toEqual([0]);
+    expect(pending.keep).toBe(1);
+    expect(pending.sorted).toBe(0);
+  });
+
+  it('tri par défaut : tout le groupe à jeter, sans avertissement (c’est le but)', () => {
     const photos = [photo(0, { deg: 0 }), photo(1, { deg: 3 })];
     const [g] = buildJunkGroups(photos, [['receipt'], ['receipt']], params, new Set());
     const choice = initialChoice(g, photos, new Map());
     expect(Object.values(choice)).toEqual(['remove', 'remove']);
     const pending = pendingRemoval([g], photos, new Map(Object.entries(choice)));
     expect(pending.remove).toHaveLength(2);
-    expect(pending.noneKept).toBe(1);
+    expect(pending.noneKept).toBe(0);
   });
 });
