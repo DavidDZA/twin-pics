@@ -31,6 +31,8 @@ ces réponses serviront à choisir les meilleurs réglages.
 1. **Appli PC** : télécharger `Twin.Pics.0.4.0.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest) (rien à installer). Windows peut afficher
    « Windows a protégé votre ordinateur » (appli non signée) : *Informations complémentaires → Exécuter quand même*.
+   Sur le PC de développement, chaque version est aussi construite dans le dossier `release/` du projet
+   (`release/Twin Pics 0.4.0.exe`, hors du dépôt).
    Pour essayer sans rien installer : le [site](https://daviddza.github.io/twin-pics/), dans Chrome ou Edge.
 2. « Choisir un dossier de photos » (sous-dossiers compris). La première analyse lit toutes les photos ; les suivantes
    ne relisent que les nouvelles (« Reprendre » rouvre le dernier dossier). Les photos HEIC (iPhone) et les vidéos ne
@@ -86,7 +88,8 @@ Fonctionnement détaillé : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Suite 
   (Settings → Pages → Source : **GitHub Actions**).
 - **Appli PC** : à chaque push sur `main` avec une **nouvelle version** dans `package.json`, `.github/workflows/release.yml`
   teste, construit l'exe sous Windows et crée la release `vX.Y.Z` (Actions → Appli PC → Run workflow pour la
-  reconstruire).
+  reconstruire). Chaque nouvelle version est aussi construite en local (`npm run dist` → `release/`), puis vérifiée
+  par `npm run e2e:exe`.
 
 ## Licence
 

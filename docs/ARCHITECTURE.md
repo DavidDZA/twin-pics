@@ -405,3 +405,5 @@ sans elles (photos déjà vues complétées).
 Les mêmes que Rank It All : messages de commit et commentaires en français, sobres ; textes de l'interface jamais en
 dur (dictionnaires, 6 langues) ; un mot plutôt qu'une icône seule ; vérifier les écrans aux formats téléphone et PC ;
 docs (README, ARCHITECTURE, ROADMAP) et tests livrés avec chaque changement ; push sur `main` une fois vérifié.
+Chaque nouvelle version de l'appli PC : l'exe construit aussi en local dans `release/` (`npm run dist`, demandé par
+l'utilisateur le 23/11), vérifié par `npm run e2e:exe` ; les anciens exe y restent.

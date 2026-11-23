@@ -29,9 +29,10 @@
 > limite de temps, mode **swipe** (je garde / je jette) ; seuils calibrés sur 1 493 photos de l'utilisateur. La
 > première analyse en 0.4 relit une fois toutes les photos (nouvelles mesures, et MobileCLIP).
 >
-> (23/11) L'utilisateur essaiera l'exe 0.4 plus tard ; rien de nouveau à coder en attendant.
+> (23/11) L'utilisateur essaiera l'exe 0.4 plus tard ; rien de nouveau à coder en attendant. À sa demande, chaque
+> version est aussi construite dans le dossier `release/` du projet (`release/Twin Pics 0.4.0.exe`).
 >
-> **Reprendre ici** : retour de l'utilisateur sur l'exe 0.4 (télécharger `Twin.Pics.0.4.0.exe` dans les *Releases*,
+> **Reprendre ici** : retour de l'utilisateur sur l'exe 0.4 (`release/Twin Pics 0.4.0.exe`, ou dans les *Releases*,
 > l'essayer sur un vrai dossier, d'abord avec le dossier « À supprimer » pour pouvoir annuler). Lui demander :
 >
 > - les **durées** : la première analyse en 0.4 relit tout (≈ 15 min pour 10 000 photos sur disque dur, plus les deux
