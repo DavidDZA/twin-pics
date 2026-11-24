@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 24/11/2026 (version 0.9). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 24/11/2026 (version 0.10). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -54,6 +54,9 @@
 > (24/11) **Version 0.9**, retours pendant l'essai de la 0.8 : groupe mis de côté tout seul quand on garde plusieurs
 > doublons ou une photo inutile (ARCHITECTURE § 4.4) ; « Effacer mes choix » d'une seule page ; plus de voile
 > gris sur les photos à supprimer.
+>
+> (24/11) **Version 0.10** : les **rafales** rangées parmi les quasi identiques passent dans les similaires, avec la plus nette
+> proposée (ARCHITECTURE § 3.3) ; trouvées pendant l'essai des visages (§ 6.2). Comparaison avec les autres applis : § 7.
 >
 > **Reprendre ici** : essai en cours par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
 > dossiers, l'avertissement pour une sauvegarde. Ensuite, proposé : un vrai ménage de ses photos (seule l'utilisation
@@ -168,5 +171,35 @@ Restent :
 - Mesurer la vitesse de MobileCLIP sur 10 000 photos (carte graphique, processeur) et le regroupement au-delà de
   4 000 photos inutiles.
 
-Captures d'écran, photos floues ou ratées, mèmes reçus, vidéos en double ; visages et yeux ouverts (MediaPipe, local)
-pour la suggestion ; préférences apprises des duels.
+Captures d'écran, photos floues ou ratées, mèmes reçus, vidéos en double ; visages et yeux ouverts (essai : § 6.2) ;
+préférences apprises des duels.
+
+### 6.2 Visages et yeux fermés : essai du 24/11/2026, pas intégré
+
+Idée : entre photos similaires, proposer celle où les gens ont les yeux ouverts. Essai hors de l'appli sur `photos test`
+(112 groupes à départager, 259 visages) : **YuNet** (OpenCV, MIT, 0,2 Mo, entrée 640 px) trouve les visages, **MediaPipe Face
+Landmarker** (Apache 2.0, modèle 3,7 Mo et moteur 14,7 Mo) mesure les yeux sur chaque visage agrandi (carré de 2 fois le
+visage, 384 px). 41 ms par photo et 23 ms par visage, sur le processeur.
+
+- **Règle retenue** : visage principal = au moins 40 % du plus grand du groupe et 60 px. **Fermé** : `eyeBlink` ≥ 0,42 pour les
+  deux yeux et ouverture géométrique (EAR) moyenne ≤ 0,13 (l'EAR écarte les lunettes de soleil). **Vu ouvert** : EAR moyenne
+  ≥ 0,14 et chaque œil ≥ 0,11, tête tournée de 30° au plus. On ne change la suggestion que si elle a des yeux fermés, pour une
+  photo avec autant de visages et plus d'yeux vus ouverts (« pas fermé » ne suffit pas : main devant le visage, profil).
+- **Résultat** : 4 suggestions aux yeux fermés, 3 corrigées, 1 sans meilleure photo ; 7 visages jugés fermés, dont 2 plissés par
+  le soleil. Règle réglée sur ces mêmes photos. Trop rare pour 19 Mo : à reprendre avec beaucoup de photos de groupe ou de
+  famille, ou pour Android. **Jamais** une raison de jeter (bébé qui dort).
+- **Netteté du visage** : abandonnée (2 changements, 2 mauvais : un profil plus net préféré à un sourire).
+- **Photos pivotées ou en miroir** (empreintes dans les 8 sens) : aucune vraie, 150 fausses paires ; abandonné.
+- **Rafales sans date EXIF** : 6 groupes quasi identiques de `photos test` ; leur date est dans le nom du fichier
+  (`IMG_20210505_172047.jpg`). La lire les rangerait dans les similaires, et permettrait de chercher leurs photos similaires.
+
+## 7. Les autres applis (24/11/2026)
+
+Recherche rapide, d'après les pages des éditeurs (rien installé). Chaque brique existe ailleurs ; pas trouvé d'appli gratuite,
+open source et locale qui réunisse doublons, similaires, photos inutiles et tri.
+
+- **PC** : FolioSort (29,99 €, le plus proche : doublons, floues, captures), Skimrr (19,99 $ : doublons, floues, HEIC et RAW),
+  Czkawka / Krokiet (open source, aussi sur Android ; pivotées et miroir), digiKam (doublons, notation de qualité), Excire Foto.
+- **Téléphone** : Google Photos (piles de photos sauvegardées en ligne), Swipewipe, Wipix, PicPicks (duels), CleanMyPhone.
+- **Plus rare chez les autres** : documents, tickets, mèmes et photos de poche sur PC ; similaires par un modèle local, sans
+  Docker ni serveur. **Mieux chez les autres** : HEIC et RAW, yeux fermés. Avant Android : recherche plus poussée sur le Play Store.

@@ -4,7 +4,7 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.9, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
+**État : appli PC** (version 0.10, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
 **photos inutiles** (floues, ratées, captures d'écran, documents…) d'un ou plusieurs dossiers. Elle les fait trier (garder une photo,
 plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le site web reste là pour essayer (il
 trouve et trie, il ne supprime pas). L'appli Android viendra ensuite. Pas de version Mac ni iPhone.
@@ -15,7 +15,7 @@ trouve et trie, il ne supprime pas). L'appli Android viendra ensuite. Pas de ver
 |---|---|---|
 | **Copies exactes** | le même fichier deux fois, copie WhatsApp identique | empreinte SHA-256 (seulement pour les fichiers de même taille) |
 | **Quasi identiques** | même photo redimensionnée, recompressée, un peu retouchée | empreinte perceptuelle dHash (64 bits), cherchée partout |
-| **Similaires** | rafale, même scène prise plusieurs fois | modèle DINOv2-small exécuté dans le navigateur (sur la carte graphique si possible), seulement entre photos prises à quelques minutes d'écart (date EXIF) |
+| **Similaires** | rafale, même scène prise plusieurs fois | modèle DINOv2-small exécuté dans le navigateur (sur la carte graphique si possible), seulement entre photos prises à quelques minutes d'écart (date EXIF) ; les rafales presque identiques, sans modèle |
 
 **Photos inutiles** (l'autre fonction) : floues, trop sombres, trop claires, presque vides (prises dans la poche),
 captures d'écran (règles simples, sans modèle) ; documents, tickets et factures, mèmes et dessins, photos prises par
@@ -28,7 +28,7 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin.Pics.0.9.0.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.10.0.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest). Rien à installer : la première ouverture se
    décompresse (une barre, 10 à 35 s), les suivantes sont immédiates (l'appli reste dans
    `%LOCALAPPDATA%\Twin Pics Portable`). Windows peut afficher « Windows a protégé votre ordinateur » (appli non

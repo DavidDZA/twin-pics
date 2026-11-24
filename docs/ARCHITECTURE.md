@@ -1,6 +1,6 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.9 : **doublons et photos inutiles
+> **À lire en premier par toute nouvelle session de travail.** État au 24/11/2026 (version 0.10 : **doublons et photos inutiles
 > séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
 > de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
@@ -258,7 +258,15 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
   fusionnent que si toutes leurs photos se ressemblent au moins à `simMin − 0,05` (`CHAIN_SLACK`). Sans lui, A
   ressemble à B, B à C… et le groupe réunit des photos sans rapport.
 - Nature du groupe : « copies exactes » si tous les fichiers sont identiques, « similaires » si un lien « similaire » a
-  servi, sinon « quasi identiques ».
+  servi **ou si c'est une rafale**, sinon « quasi identiques ».
+- **Rafale parmi les quasi identiques** (`burstShots`, 0.10, 24/11/2026) : deux prises de vue presque pareilles ont des dHash
+  aussi proches qu'une photo et sa copie. Leur groupe, déjà relié par le dHash, restait « quasi identique », et l'appli y
+  proposait le plus gros fichier au lieu de la photo la plus nette (26 des 32 groupes quasi identiques de `photos test` ; 8
+  suggestions changent). Les dates tranchent : au moins deux photos datées, de la plus grande définition du groupe, à 1 s
+  d'écart au moins (précision de l'EXIF) et `windowMin` au plus. La suggestion se choisit parmi ces prises de vue : jamais
+  une copie réduite ou sans date (WhatsApp), même jugée plus nette. Même date = copie ou retouche : rien ne change. Sans
+  modèle, donc aussi quand les photos similaires ne sont pas demandées. Sans date EXIF, la rafale reste « quasi identique »
+  (les 6 autres groupes : ROADMAP § 6).
 - **Suggestion** (`suggestBest`) : copies exactes → celle du dossier le plus haut (§ 1.1), sinon l'originale (pas dans un dossier WhatsApp, Telegram,
   téléchargements, pas de « (1) » ni « Copie » dans le nom ; puis la plus ancienne, puis le chemin le plus court) ;
   quasi identiques → la plus grande définition, puis le plus gros fichier ; similaires → la plus nette.
@@ -463,7 +471,7 @@ durées par `Intl` (`bytes`, `duration`).
 - **Vitest** : empreintes sur des images générées par sharp (`tests/images.ts` : même calcul que le worker, sous
   Node) — copie réduite et recompressée ≤ 4 bits, éclaircie ≤ 6 bits, photos différentes > 16 bits, photo floue (même
   plus claire) moins nette ; regroupement (copies exactes et suggestion de l'originale, quasi identiques selon le
-  réglage, images uniformes écartées, similaires selon la ressemblance et l'écart de temps, garde-fou contre les
+  réglage, rafales parmi elles et copies qui n'en sont pas, images uniformes écartées, similaires selon la ressemblance et l'écart de temps, garde-fou contre les
   chaînes, photos sans date jamais similaires, ordre et identifiant des groupes, photos qui ont besoin du modèle) ;
   traductions (dont : le dossier « À supprimer » n'est jamais analysé, dans toutes les langues).
 - **Version 0.5** : `ignored.test.ts` (groupes mis de côté : rétréci, agrandi, deux fonctions à part), `stats.test.ts`

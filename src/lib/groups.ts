@@ -152,6 +152,24 @@ export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] 
   return pairs;
 }
 
+/** Écart minimal entre deux prises de vue différentes : les dates EXIF sont à la seconde. */
+const BURST_GAP = 1000;
+
+/**
+ * Rafale cachée parmi les quasi identiques : deux prises de vue presque pareilles ont des dHash aussi proches qu'une photo
+ * et sa copie. Leurs dates les trahissent : une copie garde la date de l'originale. Rend les prises de vue à départager
+ * (datées, et de la plus grande définition : une copie réduite n'en est pas une), ou `null` si ce n'est pas une rafale.
+ * Deux dates trop éloignées (plus que l'écart réglé) ne prouvent rien : un logiciel a pu réécrire celle d'une retouche.
+ */
+export function burstShots(photos: PhotoInfo[], members: number[], window: number): number[] | null {
+  const top = Math.max(...members.map((i) => pixels(photos[i])));
+  if (!top) return null;
+  const shots = members.filter((i) => photos[i].time !== undefined && pixels(photos[i]) === top);
+  const times = shots.map((i) => photos[i].time!).sort((a, b) => a - b);
+  const burst = times.some((t, k) => k > 0 && t - times[k - 1] >= BURST_GAP && t - times[k - 1] <= window);
+  return burst ? shots : null;
+}
+
 /** Pourquoi la photo suggérée est proposée. */
 export type BestReason = 'original' | 'folder' | 'resolution' | 'sharpness';
 
@@ -200,7 +218,7 @@ const pixels = (p: PhotoInfo) => (p.width ?? 0) * (p.height ?? 0);
  * La photo à garder, proposée (l'utilisateur décide) :
  * - copies exactes : celle du dossier le plus haut, sinon l'originale (pas celle de WhatsApp, la plus ancienne) ;
  * - quasi identiques : la plus grande (définition), puis le plus gros fichier (moins compressé) ;
- * - similaires : la plus nette.
+ * - similaires : la plus nette (dans une rafale de quasi identiques, parmi les prises de vue : `burstShots`).
  */
 export function suggestBest(photos: PhotoInfo[], members: number[], kind: DupKind): { best: number; reason: BestReason } {
   const sorted = [...members].sort((i, j) => {
@@ -297,8 +315,9 @@ export function buildGroups(photos: PhotoInfo[], pairs: Pair[], params: Params):
   for (const [root, list] of members) {
     if (list.length < 2) continue;
     const allSame = list.every((i) => photos[i].sha && photos[i].sha === photos[list[0]].sha);
-    const kind: DupKind = allSame ? 'exact' : usedSimilar.has(root) ? 'similar' : 'near';
-    const { best, reason } = suggestBest(photos, list, kind);
+    const shots = allSame || usedSimilar.has(root) ? null : burstShots(photos, list, window);
+    const kind: DupKind = allSame ? 'exact' : usedSimilar.has(root) || shots ? 'similar' : 'near';
+    const { best, reason } = suggestBest(photos, shots ?? list, kind);
     const when = (i: number) => photos[i].time ?? photos[i].lastModified;
     const rest = list.filter((i) => i !== best).sort((i, j) => when(i) - when(j) || photos[i].path.localeCompare(photos[j].path));
     groups.push({

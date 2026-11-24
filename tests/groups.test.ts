@@ -125,6 +125,65 @@ describe('quasi identiques', () => {
   });
 });
 
+describe('rafales parmi les quasi identiques', () => {
+  const size = { width: 4000, height: 3000 };
+  const shot = (path: string, seconds: number, sharpness: number, bits = 0) => photo({ path, dhash: flip(HASH, bits), time: seconds * 1000, sharpness, ...size });
+
+  it('deux prises de vue à quelques secondes : « similaires », la plus nette proposée, même plus légère', () => {
+    const photos = [{ ...shot('a.jpg', 0, 0.2), size: 5_000_000 }, { ...shot('b.jpg', 1, 0.6, 3), size: 3_000_000 }];
+    const [g] = group(photos);
+    expect(g.kind).toBe('similar');
+    expect(photos[g.best].path).toBe('b.jpg');
+    expect(g.reason).toBe('sharpness');
+  });
+
+  it('sans le modèle aussi (photos similaires non demandées)', () => {
+    const photos = [shot('a.jpg', 0, 0.2), shot('b.jpg', 4, 0.6, 2)];
+    expect(photos.every((p) => !p.emb)).toBe(true);
+    expect(group(photos)[0].kind).toBe('similar');
+  });
+
+  it('même date (copie retouchée), ou une photo sans date (WhatsApp) : toujours « quasi identiques », la plus grosse proposée', () => {
+    const edited = [{ ...shot('a.jpg', 0, 0.2), size: 5_000_000 }, { ...shot('a-retouche.jpg', 0, 0.9, 2), size: 3_000_000 }];
+    expect(group(edited)[0].kind).toBe('near');
+    expect(edited[group(edited)[0].best].path).toBe('a.jpg');
+    const sent = [{ ...shot('b.jpg', 0, 0.2), size: 5_000_000 }, { ...shot('b-wa.jpg', 0, 0.9, 2), time: undefined }];
+    expect(group(sent)[0].kind).toBe('near');
+    expect(sent[group(sent)[0].best].path).toBe('b.jpg');
+  });
+
+  it('copie réduite dont la date a changé : toujours « quasi identiques », la plus grande proposée', () => {
+    const photos = [shot('a.jpg', 0, 0.2), { ...shot('petite.jpg', 5, 0.9, 2), width: 1600, height: 1200 }];
+    const [g] = group(photos);
+    expect(g.kind).toBe('near');
+    expect(photos[g.best].path).toBe('a.jpg');
+  });
+
+  it('dates plus éloignées que l’écart réglé : « quasi identiques »', () => {
+    const photos = [shot('a.jpg', 0, 0.2), shot('b.jpg', 15 * 60, 0.9, 2)];
+    expect(group(photos, { ...DEFAULTS, windowMin: 10 })[0].kind).toBe('near');
+    expect(group(photos, { ...DEFAULTS, windowMin: 20 })[0].kind).toBe('similar');
+  });
+
+  it('une rafale et des copies réduites : la plus nette des prises de vue, jamais une copie', () => {
+    const photos = [
+      shot('1.jpg', 0, 0.2),
+      shot('2.jpg', 2, 0.5, 2),
+      { ...shot('2-petite.jpg', 2, 0.9, 2), width: 1600, height: 1200 },
+      { ...shot('2-wa.jpg', 2, 0.95, 3), time: undefined },
+    ];
+    const [g] = group(photos);
+    expect(g.kind).toBe('similar');
+    expect(g.members).toHaveLength(4);
+    expect(photos[g.best].path).toBe('2.jpg');
+  });
+
+  it('définition ou dates inconnues : « quasi identiques »', () => {
+    expect(group([photo({ path: 'a.jpg', dhash: HASH, time: 0 }), photo({ path: 'b.jpg', dhash: flip(HASH, 2), time: 3000 })])[0].kind).toBe('near');
+    expect(group([photo({ path: 'a.jpg', dhash: HASH, ...size }), photo({ path: 'b.jpg', dhash: flip(HASH, 2), ...size })])[0].kind).toBe('near');
+  });
+});
+
 describe('similaires', () => {
   it('même scène à quelques secondes : regroupées, la plus nette proposée', () => {
     const photos = [
