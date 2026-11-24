@@ -57,11 +57,11 @@ async function withDay(s: Stats, seen: Seen): Promise<Stats> {
 
 const readSeen = async (): Promise<Seen> => ({ folders: [], day: '', ...(await getMeta<Partial<Seen>>(SEEN_KEY)) });
 
-/** Une analyse finie : `photos` vues, du dossier `folder`. */
-export function countScan(photos: number, folder: string): void {
+/** Une analyse finie : `photos` vues, des dossiers `folders`. */
+export function countScan(photos: number, folders: string[]): void {
   update(async (s) => {
     const seen = await readSeen();
-    if (!seen.folders.includes(folder)) seen.folders.push(folder);
+    for (const f of folders) if (!seen.folders.includes(f)) seen.folders.push(f);
     await setMeta(SEEN_KEY, seen);
     const out = atLeast(add(s, { scans: 1 }), { biggestScan: photos, folders: seen.folders.length });
     return withDay({ ...out, analyzed: await db.photos.count() }, seen);

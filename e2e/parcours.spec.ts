@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { join } from 'node:path';
-import { PHOTOS_DIR } from './photos';
+import { KEY_DIR, openPhotos, PHOTOS_DIR } from './photos';
 
 /** Analyse le dossier d'essai (par le champ d'envoi de dossier), photos similaires comprises ou non : les doublons s'ouvrent. */
 async function analyze(page: Page, similar = false) {
@@ -8,7 +8,7 @@ async function analyze(page: Page, similar = false) {
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if ((await box.isChecked()) !== similar) await box.click();
   await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await openPhotos(page);
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: similar ? 120_000 : 30_000 });
 }
 
@@ -73,8 +73,8 @@ test('les curseurs refont les groupes en direct', async ({ page }) => {
 test('une nouvelle analyse ne refait rien, et ne recharge aucun modèle', async ({ page }) => {
   await analyze(page);
   await expect(page.getByText(/nouvelles?\)/)).toBeVisible();
-  await page.getByRole('button', { name: 'Autre dossier' }).click();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await openPhotos(page);
   await expect(page.getByText('rien de nouveau')).toBeVisible();
 });
 
@@ -91,8 +91,8 @@ test('« Pas des doublons » : le groupe disparaît, reste caché après une nou
 
   await groups.first().getByRole('button', { name: 'Pas des doublons' }).click();
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 1');
-  await page.getByRole('button', { name: 'Autre dossier' }).click();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await openPhotos(page);
   await expect(page.getByText('rien de nouveau')).toBeVisible();
   await expect(groups).toHaveCount(1);
   await page.getByText('Groupes mis de côté (1)').click();
@@ -215,13 +215,80 @@ test('un clic pour passer des doublons aux photos inutiles ; la dernière ouvert
   await expect(page.getByTestId('space-dup')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  // « Relancer » n'existe que pour un dossier relançable (appli PC, File System Access API) ; « Autre dossier », toujours.
+  // « Relancer » n'existe que pour un dossier relançable (appli PC, File System Access API) ; « Dossiers… », toujours.
   await expect(page.getByRole('button', { name: 'Relancer' })).toHaveCount(0);
   await head.getByRole('button', { name: 'Photos inutiles 7' }).click();
   await page.screenshot({ path: join(import.meta.dirname, '..', 'test-results', `barre-${info.project.name}.png`) });
-  await page.getByRole('button', { name: 'Autre dossier' }).click();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await openPhotos(page);
   await expect(page.getByTestId('space-junk')).toBeVisible();
+});
+
+test('plusieurs dossiers : liste, ordre, doublons d’un dossier à l’autre', async ({ page }, info) => {
+  await page.goto('/');
+  for (const name of [/photos similaires/, /documents, tickets et mèmes/]) await page.getByRole('checkbox', { name }).uncheck();
+  await expect(page.getByRole('button', { name: 'Analyser' })).toHaveCount(0);
+  const input = page.getByTestId('folder-input');
+  const list = page.getByTestId('folders').locator('li');
+  await input.setInputFiles(PHOTOS_DIR);
+  await expect(list).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Ajouter un dossier' })).toBeVisible();
+  await expect(page.getByText(/celle du dossier le plus haut/)).toHaveCount(0);
+  await input.setInputFiles(KEY_DIR);
+  await expect(list.locator('strong')).toHaveText(['Mes photos', 'Clé']);
+  await expect(page.getByText(/celle du dossier le plus haut/)).toBeVisible();
+  // Le même dossier renvoyé ne s'ajoute pas une deuxième fois.
+  await input.setInputFiles(PHOTOS_DIR);
+  await expect(list.locator('strong')).toHaveText(['Mes photos', 'Clé']);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: join(import.meta.dirname, '..', 'test-results', `dossiers-${info.project.name}.png`), fullPage: true });
+
+  // « Mes photos » d'abord : ses copies sont proposées, bien que celles de la clé soient plus anciennes.
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByTestId('analyzed')).toHaveText('18 photos analysées.', { timeout: 30_000 });
+  await expect(page.getByText('Dossiers : Mes photos, Clé.')).toBeVisible();
+  const mountain = page.getByTestId('group').filter({ hasText: 'montagne.jpg' });
+  await expect(mountain.locator('li.best')).toContainText('Mes photos/Vacances');
+  await expect(mountain.getByText('Suggestion · dossier prioritaire')).toBeVisible();
+  await expect(page.getByTestId('group').filter({ hasText: 'chat.jpg' }).locator('li')).toHaveCount(3);
+  // Le récapitulatif dit combien partent de chaque dossier.
+  await page.getByRole('button', { name: /Supprimer toutes les copies exactes/ }).click();
+  await expect(page.getByTestId('by-folder').locator('li')).toHaveText(['Mes photos 2 photos à supprimer', 'Clé 2 photos à supprimer']);
+  await expect(page.getByText(/si l’un des dossiers est une sauvegarde/)).toBeVisible();
+  await page.screenshot({ path: join(import.meta.dirname, '..', 'test-results', `dossiers-supprimer-${info.project.name}.png`) });
+  await page.keyboard.press('Escape');
+
+  // La clé d'abord : ce sont les siennes qui sont proposées.
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  // Poignée ⠿ glissée vers le haut, puis flèches du clavier (qui suivent le dossier).
+  const key = page.getByRole('button', { name: 'Déplacer « Clé »' });
+  const from = (await key.boundingBox())!;
+  const top = (await list.first().boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, top.y + top.height / 2, { steps: 6 });
+  await expect(list.nth(1)).toHaveClass('dragging');
+  await page.screenshot({ path: join(import.meta.dirname, '..', 'test-results', `dossiers-glisser-${info.project.name}.png`) });
+  await page.mouse.up();
+  await expect(list.locator('strong')).toHaveText(['Clé', 'Mes photos']);
+  await key.press('ArrowDown');
+  await expect(list.locator('strong')).toHaveText(['Mes photos', 'Clé']);
+  await expect(key).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(list.locator('strong')).toHaveText(['Clé', 'Mes photos']);
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByText('rien de nouveau')).toBeVisible();
+  await expect(mountain.locator('li.best')).toContainText('Clé/Sauvegarde');
+
+  // Un dossier retiré n'est plus analysé.
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await page.getByRole('button', { name: 'Retirer (Clé)' }).click();
+  // Un seul dossier : plus rien à ranger.
+  await expect(page.locator('.drag-handle')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByTestId('analyzed')).toHaveText('15 photos analysées.');
+  await expect(mountain).toHaveCount(0);
 });
 
 test('barre d’ouverture pendant le chargement de l’appli', async ({ page }) => {
@@ -292,7 +359,7 @@ test('langue : en anglais, toute l’interface suit', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Choose a photo folder' })).toBeVisible();
   await page.getByRole('checkbox', { name: /similar photos/ }).uncheck();
   await page.getByRole('checkbox', { name: /documents, receipts and memes/ }).uncheck();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await openPhotos(page, 'Analyze');
   await expect(page.getByText('15 photos analyzed.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicates 3' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Exact copies/ })).toBeVisible();
@@ -333,10 +400,10 @@ test.describe('modèle des photos similaires (téléchargé : E2E_MODELE=1)', ()
   test('photos similaires demandées après une analyse sans elles : les photos déjà vues sont complétées', async ({ page }) => {
     await analyze(page);
     await expect(page.getByText(/calculées par/)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Autre dossier' }).click();
+    await page.getByRole('button', { name: 'Dossiers…' }).click();
     await page.getByRole('checkbox', { name: /photos similaires/ }).check();
     await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
-    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await openPhotos(page);
     await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 120_000 });
     await expectBurst(page);
   });

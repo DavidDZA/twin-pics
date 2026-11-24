@@ -3,10 +3,11 @@ import type { DesktopApi } from '../src/platform/bridge';
 
 /** Pont entre l'interface et le processus principal : `window.twinPics` (types dans `src/platform/bridge.ts`). */
 const api: DesktopApi = {
-  pickFolder: () => ipcRenderer.invoke('folder:pick'),
-  lastFolder: () => ipcRenderer.invoke('folder:last'),
-  openFolder: (path) => ipcRenderer.invoke('folder:open', path),
-  list: (root, exclude) => ipcRenderer.invoke('folder:list', root, exclude),
+  pickFolders: () => ipcRenderer.invoke('folder:pick'),
+  lastFolders: () => ipcRenderer.invoke('folder:last'),
+  saveFolders: (paths) => ipcRenderer.invoke('folder:save', paths),
+  openFolders: (paths) => ipcRenderer.invoke('folder:open', paths),
+  list: (roots, exclude) => ipcRenderer.invoke('folder:list', roots, exclude),
   onListProgress: (listener) => {
     const handler = (_e: IpcRendererEvent, found: number) => listener(found);
     ipcRenderer.on('list:progress', handler);

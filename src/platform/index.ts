@@ -14,16 +14,17 @@ export const desktop: DesktopApi | undefined = typeof window !== 'undefined' ? w
 /** Page des versions de l'appli PC (exe), proposée sur le site. */
 export const RELEASES_URL = 'https://github.com/DavidDZA/twin-pics/releases/latest';
 
-/** Les photos d'un dossier, lues par l'appli PC. */
-export async function listDesktop(api: DesktopApi, root: string, exclude: string[], onProgress: (found: number) => void): Promise<Listing> {
+/** Les photos des dossiers, lues par l'appli PC. */
+export async function listDesktop(api: DesktopApi, roots: string[], exclude: string[], onProgress: (found: number) => void): Promise<Listing> {
   const off = api.onListProgress(onProgress);
   try {
-    const l = await api.list(root, exclude);
+    const l = await api.list(roots, exclude);
     return {
       images: l.files.map((f) => ({
         path: f.path,
         size: f.size,
         lastModified: f.lastModified,
+        rank: f.root,
         read: async () => {
           const res = await fetch(photoUrl(f.path));
           if (!res.ok) throw new Error(`lecture impossible (${res.status})`);
@@ -44,7 +45,7 @@ const FOLDER_KEY = 'remove-folder';
 
 export interface RemoveSettings {
   mode: RemoveMode;
-  /** Dossier « À supprimer » choisi ; vide : celui par défaut, dans le dossier analysé. */
+  /** Dossier « À supprimer » choisi ; vide : ceux par défaut, un dans chaque dossier analysé. */
   folder: string;
 }
 
@@ -65,7 +66,7 @@ export function saveRemoveSettings(s: RemoveSettings): void {
   }
 }
 
-/** Le dossier « À supprimer » utilisé : celui choisi, sinon `<dossier analysé>/<nom par défaut>`. */
-export function removeFolder(s: RemoveSettings, root: string, defaultName: string): string {
-  return s.folder || `${root.replace(/\/$/, '')}/${defaultName}`;
+/** Les dossiers « À supprimer » utilisés : celui choisi, sinon `<dossier analysé>/<nom par défaut>` pour chacun. */
+export function removeFolders(s: RemoveSettings, roots: string[], defaultName: string): string[] {
+  return s.folder ? [s.folder] : roots.map((r) => `${r.replace(/\/$/, '')}/${defaultName}`);
 }

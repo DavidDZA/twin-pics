@@ -224,3 +224,112 @@
     flex-wrap: wrap;
   }
 }
+
+/* Départ : la liste des dossiers */
+.folders {
+  margin-top: 22px;
+}
+
+.folders h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.folders ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folders li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+
+/* Poignée ⠿, comme les classements de Rank It All. */
+.drag-handle {
+  flex: none;
+  width: 34px;
+  align-self: stretch;
+  min-height: 40px;
+  margin: -8px 0 -8px -12px;
+  padding: 0 0 0 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.3rem;
+  cursor: grab;
+  touch-action: none; /* sinon le téléphone fait défiler la page */
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.folder-rank {
+  flex: none;
+  min-width: 1.2em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.folders ul.sorting {
+  user-select: none;
+}
+
+.folders ul.sorting li:not(.dragging) {
+  transition: transform 0.15s;
+}
+
+.folders li.dragging {
+  position: relative;
+  z-index: 2;
+  border-color: var(--brand-a);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+}
+
+.folders .folder-text {
+  flex: 1 1 120px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.folders .folder-text strong,
+.folders .path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folders li.missing strong,
+.folders li.missing .path {
+  opacity: 0.55;
+}
+
+.folders li .warning {
+  margin: 0;
+}
+
+.folders > p {
+  margin: 8px 0;
+}
+
+/* « Avant de supprimer » : ce qui part de chaque dossier */
+.by-folder {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.folder-choice.several code {
+  flex-basis: 100%;
+}

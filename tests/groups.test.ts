@@ -47,6 +47,35 @@ describe('copies exactes', () => {
   });
 });
 
+describe('plusieurs dossiers', () => {
+  it('copies exactes : celle du dossier le plus haut, même plus récente ou dans WhatsApp', () => {
+    const photos = [
+      photo({ path: 'E:/Clé/plage.jpg', sha: 'x', lastModified: 1, rank: 1 }),
+      photo({ path: 'F:/Photos/WhatsApp/plage (1).jpg', sha: 'x', lastModified: 9, rank: 0 }),
+      photo({ path: 'G:/Disque/plage.jpg', sha: 'x', lastModified: 2, rank: 2 }),
+    ];
+    const [g] = group(photos);
+    expect(photos[g.best].path).toBe('F:/Photos/WhatsApp/plage (1).jpg');
+    expect(g.reason).toBe('folder');
+  });
+
+  it('dans un même dossier, l’originale comme avant', () => {
+    const photos = [photo({ path: 'F:/A/photo (1).jpg', sha: 'x', lastModified: 1, rank: 1 }), photo({ path: 'F:/A/photo.jpg', sha: 'x', lastModified: 2, rank: 1 })];
+    const [g] = group(photos);
+    expect(photos[g.best].path).toBe('F:/A/photo.jpg');
+    expect(g.reason).toBe('original');
+  });
+
+  it('quasi identiques : la plus grande gagne, où qu’elle soit ; à égalité, le dossier le plus haut', () => {
+    const big = [photo({ path: 'F:/a.jpg', dhash: HASH, width: 800, height: 600, rank: 0 }), photo({ path: 'E:/a.jpg', dhash: HASH, width: 4000, height: 3000, rank: 1 })];
+    expect(big[group(big)[0].best].path).toBe('E:/a.jpg');
+    expect(group(big)[0].reason).toBe('resolution');
+    const same = [photo({ path: 'E:/b.jpg', dhash: HASH, width: 800, height: 600, lastModified: 1, rank: 1 }), photo({ path: 'F:/b.jpg', dhash: HASH, width: 800, height: 600, lastModified: 5, rank: 0 })];
+    expect(same[group(same)[0].best].path).toBe('F:/b.jpg');
+    expect(group(same)[0].reason).toBe('folder');
+  });
+});
+
 describe('quasi identiques', () => {
   it('regroupées selon l’écart choisi, la plus grande proposée', () => {
     const photos = [

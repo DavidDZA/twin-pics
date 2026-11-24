@@ -1,6 +1,6 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.7 : **doublons et photos inutiles
+> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.8 : **doublons et photos inutiles
 > séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
 > de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
@@ -8,7 +8,7 @@
 
 ## 1. L'appli
 
-On choisit un dossier de photos, l'appli trouve les groupes de doublons, propose la photo à garder, fait trier
+On choisit un ou plusieurs dossiers de photos, l'appli trouve les groupes de doublons, propose la photo à garder, fait trier
 chaque groupe et supprime ce qui doit l'être après un récapitulatif. **Rien ne quitte l'ordinateur** : les photos sont
 lues et analysées sur place ; seul le modèle des photos similaires est téléchargé (une fois).
 
@@ -23,14 +23,15 @@ Pas de version Mac ni iPhone (décision du 23/11/2026).
 
 Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
 
-- **Départ** (`StartScreen`) : « Choisir un dossier de photos », « Reprendre « dossier » » (le dernier dossier : son
-  chemin dans l'appli PC, son accès File System Access API sur le site), case « Chercher aussi les photos
-  similaires » (retenue : `opt-similar`, localStorage). Sur le site, une ligne renvoie vers l'appli PC.
+- **Départ** (`StartScreen`) : la **liste des dossiers** (§ 1.1), « Choisir un dossier de photos » puis « Ajouter un
+  dossier », « Analyser » ; cases « Chercher aussi les photos similaires » et « Reconnaître aussi les documents… »
+  (retenues : `opt-similar`, `opt-junk-model`, localStorage). Sur le site, une ligne renvoie vers l'appli PC.
 - **Analyse** (`ScanScreen`) : étape en cours, barre de progression, temps restant estimé, « Arrêter ».
   « Téléchargement du modèle » ne s'affiche que s'il est vraiment téléchargé, sinon « Préparation du modèle ».
 - **Résultats** (`Results`), **une seule page** (0.7). Une barre en haut : **« Doublons | Photos inutiles »** (nombre de
-  photos ; un clic passe de l'une à l'autre, la dernière ouverte est retenue : `last-function`), « Relancer », « Autre
-  dossier », « Effacer tous mes choix… » (s'il y en a) ; puis une ligne : photos analysées, durée, ce qui n'a pas été
+  photos ; un clic passe de l'une à l'autre, la dernière ouverte est retenue : `last-function`), « Relancer »,
+  « Dossiers… » (retour à la liste), « Effacer tous mes choix… » (s'il y en a) ; puis une ligne : photos analysées, durée,
+  noms des dossiers s'il y en a plusieurs, ce qui n'a pas été
   analysé, où ont tourné les modèles. En dessous, la fonction choisie (`Space`) : 3 cases, la barre de tri (« Trier… »,
   « Continuer le tri », « Revoir le tri » ; « Supprimer n photos… »), ses réglages (`SettingsPanel` ou `JunkSettings`,
   retenus : `detect-params`, `junk-params`), ses groupes (`GroupCard`, 30 puis « Voir plus » : état du tri photo par photo,
@@ -44,6 +45,32 @@ Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
   supprimer »** (`RemoveDialog`), « Effacer tous mes choix » (`ResetDialog`), « Stats et badges » (`StatsDialog`), et les petits
   messages (`Toasts`, `notify.ts` : badge gagné, groupe mis de côté avec « Annuler »).
 
+### 1.1 Plusieurs dossiers à la fois (0.8, 24/11/2026 ; `folders.ts`)
+
+Demandé par l'utilisateur (deux disques, le PC et une clé).
+
+- **Liste** retenue d'une fois à l'autre : `reglages.json` (`folders`) dans l'appli PC, meta `folders` sur le site (accès
+  File System Access API ; pas les dossiers du champ d'envoi). L'ancien dossier unique (`lastFolder`, meta `folder`) est
+  repris. Un clic de plus qu'avant pour un nouveau dossier (« Analyser »), autant que « Reprendre » pour l'ancien. Dans
+  l'appli PC, la fenêtre de choix en accepte plusieurs d'un coup (Ctrl).
+- **Jamais deux fois la même photo** : elle serait en double d'elle-même, et supprimée. Un dossier déjà compris dans un
+  autre n'est pas ajouté ; un dossier qui en comprend d'autres prend leur place ; un message le dit (`addFolder`). Dans
+  l'appli PC, second contrôle à la lecture, par le vrai emplacement (`independentRoots`, `realpath`) : lecteur réseau,
+  « subst » ou jonction. Champ d'envoi du site : le navigateur cache les chemins, un dossier renvoyé (un fichier commun)
+  remplace l'ancien.
+- **L'ordre compte** : chaque photo a le rang de son dossier (`PhotoInfo.rank`) ; entre deux copies, celle du dossier le
+  plus haut est proposée, avant les autres règles de l'originale (raison « dossier prioritaire »). Pour les quasi
+  identiques et les similaires, la taille et la netteté passent toujours avant. La liste se range comme les classements de
+  Rank It All (`FolderList`) : **poignée ⠿** à glisser (souris, doigt), ou flèches haut et bas du clavier ; code maison
+  (`dropIndex`, `moveTo`), sans bibliothèque. Le premier essai, « Mettre en premier », n'était pas compris par
+  l'utilisateur : le texte dit maintenant à quoi sert l'ordre.
+- **Dossier débranché ou refusé** : il reste dans la liste (« Introuvable pour l'instant »), l'analyse se fait sans lui et
+  le dit ; ses choix restent en base.
+- **Noms** : dans l'appli PC, deux dossiers du même nom sont montrés avec leur chemin complet (`display.ts`) ; sur le
+  site, « Photos » et « Photos (2) », sans quoi leurs photos auraient la même clé.
+- **Suppression** : § 4.2. Le récapitulatif compte ce qui part de chaque dossier et, pour « toutes les copies exactes »,
+  prévient si l'un d'eux est une sauvegarde.
+
 ## 2. Technique
 
 | Élément | Choix |
@@ -51,7 +78,7 @@ Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
 | Front | Vite, React 19, TypeScript ; CSS `src/styles.css` (base, thème clair / sombre selon l'appareil), `src/sort.css` (tri, suppression), `src/junk.css` (swipe), `src/space.css` (deux cartes, stats), `src/theme.css` (habillage, § 2.2) |
 | Appli PC | **Electron** 45 (`electron/`, construit par esbuild), exe portable par **electron-builder** (`npm run dist`, workflow `release.yml`) : § 2.1 |
 | Base locale | IndexedDB via **Dexie** (`src/lib/db.ts`), base `twin-pics` : `photos`, `thumbs`, `labels`, `meta`, `marks`, `junkMarks` |
-| Lecture du dossier | Appli PC : le processus principal liste le dossier (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
+| Lecture des dossiers | Appli PC : le processus principal liste les dossiers (`electron/list.ts`), la page lit chaque photo par `app://twin-pics/_photo/…`. Site : **File System Access API** (`showDirectoryPicker`, Chrome / Edge), sinon champ `webkitdirectory` (`files.ts`) |
 | Analyse | fichiers lus par la page (2 à la fois), analysés dans des workers (`analyze.worker.ts`), un par cœur moins un (6 au plus) ; EXIF par **exifr** |
 | Photos similaires | **Transformers.js** + ONNX Runtime Web, modèle `onnx-community/dinov2-small` : carte graphique (WebGPU, `fp16`, 44 Mo), sinon processeur (WebAssembly, `q8`, 24 Mo) |
 | Photos inutiles | règles sur des mesures de qualité (`quality.ts`) ; modèle **MobileCLIP-S1** (`Xenova/mobileclip_s1`, partie image) : carte graphique (`fp16`, 43 Mo), sinon processeur (`fp32`, 86 Mo) ; phrases livrées avec l'appli (`junkPrompts.json`), § 4.3 |
@@ -62,7 +89,7 @@ Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
 electron/            appli PC (processus principal, Node) : construit en dist-electron/ par scripts/build-electron.mjs
   main.ts              fenêtre, protocole app://twin-pics/, échanges avec l'interface (IPC)
   preload.ts           window.twinPics (types : src/platform/bridge.ts)
-  list.ts              liste d'un dossier ; remove.ts : Corbeille, dossier « À supprimer », annulation ; paths.ts
+  list.ts              liste des dossiers ; remove.ts : Corbeille, dossier « À supprimer », annulation ; paths.ts
 src/
   App.tsx            les trois écrans, lancement de l'analyse
   platform/          site ou appli PC : index.ts (desktop, liste, réglages de suppression), bridge.ts (window.twinPics)
@@ -76,6 +103,7 @@ src/
     quality.ts         netteté de la zone la plus nette, luminosité, contraste (code pur)
     junk.ts            photos inutiles : raisons, scores MobileCLIP, groupes (code pur) ; junkPrompts.json
     clip.worker.ts     MobileCLIP (vecteur de 512 nombres par photo)
+    folders.ts         liste des dossiers (ajout, ordre, noms), § 1.1 ; components/FolderList : la poignée ⠿
     display.ts         chemins affichés à partir du dossier analysé
     scan.ts            l'analyse de bout en bout (base, lecture, workers, modèle, paires)
     pool.ts            limiter les tâches simultanées (Limiter), faire travailler des workers (WorkerPool)
@@ -106,9 +134,9 @@ Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disq
   développement (`npm run dev:pc`), elle vient de Vite (`VITE_DEV_URL`).
 - **Photos** : `app://twin-pics/_photo/<chemin>` ; le processus principal ne sert que les fichiers des dossiers
   choisis pendant la session (`roots`). Les chemins sont complets, avec des « / » (`F:/Photos/a.jpg`) ; ils servent
-  aussi de clé (`photoKey`). Affichés à partir du dossier analysé (`display.ts`), complets dans l'infobulle.
-- **Pont** (`preload.ts`, `contextIsolation`, `sandbox`) : `window.twinPics` = choisir un dossier, dernier dossier
-  (`reglages.json` dans le dossier de l'appli), lister, choisir le dossier « À supprimer », supprimer, annuler, ouvrir
+  aussi de clé (`photoKey`). Affichés à partir de leur dossier analysé (`display.ts`), complets dans l'infobulle.
+- **Pont** (`preload.ts`, `contextIsolation`, `sandbox`) : `window.twinPics` = choisir des dossiers, dossiers de la
+  dernière fois (`reglages.json` dans le dossier de l'appli), lister, choisir le dossier « À supprimer », supprimer, annuler, ouvrir
   l'Explorateur, ouvrir un lien. Les liens `target="_blank"` s'ouvrent dans le navigateur.
 - **Ouverture** (23/11/2026, l'utilisateur trouvait l'appli lente à s'ouvrir ; mesures sur son PC) : le portable
   d'electron-builder se décompresse à chaque lancement (≈ 300 Mo, vérifiés par l'antivirus), sans rien montrer : **34 à
@@ -127,7 +155,7 @@ Décidée le 22/11/2026 : un exe plutôt qu'un site, pour un vrai accès au disq
 - **Paquet** : toutes les dépendances sont des `devDependencies` (l'interface est empaquetée par Vite) : l'exe
   n'embarque aucun `node_modules` (≈ 110 Mo, Electron compris).
 - Variables d'environnement des tests : `TP_USER_DATA` (dossier de l'appli), `TP_PICK_FOLDER` /
-  `TP_PICK_REMOVE_FOLDER` (réponses des fenêtres de choix de dossier), `TP_FAKE_TRASH` (dossier qui remplace la
+  `TP_PICK_REMOVE_FOLDER` (réponses des fenêtres de choix de dossier ; plusieurs séparés par « ; »), `TP_FAKE_TRASH` (dossier qui remplace la
   Corbeille), `TP_FAKE_TRASH_FAIL` (Corbeille refusée, comme sur une clé USB).
 
 ### 2.2 Habillage (`theme.css`)
@@ -231,7 +259,7 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
   ressemble à B, B à C… et le groupe réunit des photos sans rapport.
 - Nature du groupe : « copies exactes » si tous les fichiers sont identiques, « similaires » si un lien « similaire » a
   servi, sinon « quasi identiques ».
-- **Suggestion** (`suggestBest`) : copies exactes → l'originale (pas dans un dossier WhatsApp, Telegram,
+- **Suggestion** (`suggestBest`) : copies exactes → celle du dossier le plus haut (§ 1.1), sinon l'originale (pas dans un dossier WhatsApp, Telegram,
   téléchargements, pas de « (1) » ni « Copie » dans le nom ; puis la plus ancienne, puis le chemin le plus court) ;
   quasi identiques → la plus grande définition, puis le plus gros fichier ; similaires → la plus nette.
 - Les photos **presque vides** (`isFlat` : dHash ≤ 4 ou ≥ 60 bits à 1, ou **contraste < 10**) ne sont jamais « quasi
@@ -251,7 +279,7 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
 - `thumbs` : miniatures (≈ 10 Ko chacune ; à surveiller pour 50 000 photos : ROADMAP).
 - `labels` : groupes mis de côté (`groupId`, verdict `wrong`, nature, clés des photos), § 4.4. Les anciens verdicts
   `good` (« Bien trouvé », jusqu'à la 0.4, sans effet) sont ignorés.
-- `meta` : `folder` (site : accès au dernier dossier, gardé par Chrome ; redemandé au clic sur « Reprendre ») ;
+- `meta` : `folders` (site : accès aux dossiers, gardés par Chrome ; redemandés au clic sur « Analyser ») ;
   `models` (versions des modèles), `stats` (§ 4.6).
 - `photos` porte aussi, depuis la version 0.4 : `quality` et `qv` (mesures de qualité et leur version), `clip` et
   `clipModel` (vecteur MobileCLIP et sa version, `clipId(dtype)`).
@@ -324,12 +352,13 @@ supprimer ; les suppressions faites à la fin, en une fois.
   dossier « À supprimer », retenu : `remove-mode`, `remove-folder`), « Annuler » / « Supprimer n photos ».
 - **Corbeille de Windows** (`shell.trashItem`) : sur un disque sans Corbeille (clé USB), Electron refuse au lieu
   d'effacer : la photo n'est pas touchée et le compte rendu conseille le dossier « À supprimer ».
-- **Dossier « À supprimer »** : par défaut `<dossier analysé>/Twin Pics - À supprimer` (nom traduit, toujours
-  commencé par `Twin Pics - ` : jamais analysé, `isSkippedDir`), ou un dossier choisi (« Changer… », exclu de
-  l'analyse). Les photos y gardent leurs sous-dossiers, jamais par-dessus un fichier (« plage (2).jpg ») ; d'un disque
+- **Dossier « À supprimer »** : par défaut un dans chaque dossier analysé, `<dossier analysé>/Twin Pics - À supprimer`
+  (même disque : déplacement immédiat ; nom traduit, toujours
+  commencé par `Twin Pics - ` : jamais analysé, `isSkippedDir`), ou un seul dossier choisi (« Changer… », exclu de
+  l'analyse ; les photos de plusieurs dossiers y sont séparées par le nom du leur). Les photos y gardent leurs sous-dossiers, jamais par-dessus un fichier (« plage (2).jpg ») ; d'un disque
   à l'autre, copie puis effacement. **« Annuler »** juste après les remet à leur place.
-- Envoi par paquets de 20 (progression « Suppression… n / N ») ; le processus principal refuse tout fichier hors du
-  dossier analysé. Ensuite : compte rendu (« n photos supprimées, taille libérée », où elles sont, échecs), les photos
+- Envoi par paquets de 20 (progression « Suppression… n / N ») ; le processus principal refuse tout fichier hors des
+  dossiers analysés. Ensuite : compte rendu (« n photos supprimées, taille libérée », où elles sont, échecs), les photos
   disparaissent des groupes (`gone`) et leurs choix sont effacés. Les lignes de `photos` restent (une photo remise à
   sa place garde la même clé).
 
@@ -442,9 +471,12 @@ durées par `Intl` (`bytes`, `duration`).
 - **Tri** (`choices.test.ts`) : suggestion seule par défaut, en garder plusieurs ou aucune, groupe trié ou non, choix
   repris, photos à supprimer et place libérée, « tout supprimer » signalé, photo marquée hors groupe jamais supprimée,
   duels (la gagnante affronte la suivante, groupe de deux photos).
+- **Dossiers** (`folders.test.ts`) : ajout, dossier répété ou compris dans un autre (chemins, File System Access API, champ
+  d'envoi), disque entier, ordre et glissement, noms et chemins affichés ; `groups.test.ts` : copie du dossier le plus haut proposée.
 - **Appli PC** (`pc.test.ts`, vrai dossier temporaire) : liste (sous-dossiers, HEIC et vidéos comptés, corbeilles et
   dossier « À supprimer » ignorés), chemins (« .. » refusé), Corbeille (refus = photo intacte), dossier « À supprimer »
-  (sous-dossiers, pas d'écrasement, annulation), photo hors du dossier ou disparue, noms libres.
+  (sous-dossiers, pas d'écrasement, annulation), photo hors du dossier ou disparue, noms libres ; plusieurs
+  dossiers (rangs, dossier répété, sous-dossier, jonction, dossier introuvable, « À supprimer » dans chacun ou choisi).
 - **Outils de parallélisme** (`pool.test.ts`) : jamais plus de tâches simultanées que permis, place libérée après un
   échec, file d'attente du modèle qui bloque l'analyse quand elle est pleine ; une demande à la fois par worker, chaque
   réponse à sa demande, erreur limitée à sa demande, « Arrêter » qui annule tout.
@@ -452,7 +484,7 @@ durées par `Intl` (`bytes`, `duration`).
   réduite, rafale floue, photo cassée, HEIC, vidéo), lu par le champ `webkitdirectory` (la fenêtre de choix de dossier
   ne s'automatise pas). Parcours : écran de départ, groupes trouvés et suggestions, photos non analysées, curseurs,
   barre du haut sans page intermédiaire, « Pas des doublons » (annuler, retenu, remettre), seconde analyse sans rien refaire, visionneuse (zoom à la
-  molette, au clavier, au double clic, à deux doigts, gardé d'une photo à l'autre), stats et badges (badge gagné et daté), un clic d'une fonction à l'autre (retenue), barre d'ouverture, miniatures, pas de défilement horizontal,
+  molette, au clavier, au double clic, à deux doigts, gardé d'une photo à l'autre), stats et badges (badge gagné et daté), un clic d'une fonction à l'autre (retenue), plusieurs dossiers (liste, ordre à la poignée et au clavier, doublons d'un dossier à l'autre, retrait), barre d'ouverture, miniatures, pas de défilement horizontal,
   anglais. Avec `E2E_MODELE=1` (télécharge le modèle) : rafale trouvée pendant l'analyse, la plus nette proposée, et
 où a tourné le modèle affiché ; même chose sur le processeur forcé ; photos similaires demandées après une analyse
 sans elles (photos déjà vues complétées).
@@ -473,7 +505,8 @@ sans elles (photos déjà vues complétées).
 - **Playwright, appli PC** (`npm run e2e:pc`, `e2e-pc/appli.spec.ts`, vraie appli Electron, copie du dossier
   d'essai) : photos d'origine lues par `app://`, grille, récapitulatif, Corbeille (dossier d'essai), dossier « À
   supprimer » (sous-dossiers, ignoré par la nouvelle analyse), annulation, toutes les copies exactes, disque sans Corbeille, « Tout supprimer »
-  et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant, photos inutiles triées en swipe puis à la
+  et touches 1 à 9 / Entrée, tri et dossier retrouvés au lancement suivant, plusieurs dossiers (choisis d'un coup, « À supprimer » dans chacun,
+  annulation, clé débranchée, dossier retenu par une version d'avant la 0.8), photos inutiles triées en swipe puis à la
   Corbeille ; avec `E2E_MODELE=1`, photos similaires
   sur la carte graphique.
 

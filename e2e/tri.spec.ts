@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { join } from 'node:path';
-import { PHOTOS_DIR } from './photos';
+import { openPhotos } from './photos';
 
 /**
  * Le tri sur le site (téléphone et PC) : duels, grille, groupes passés, fenêtre « Avant de supprimer » (le site ne
@@ -15,7 +15,7 @@ async function analyze(page: Page) {
   const box = page.getByRole('checkbox', { name: /photos similaires/ });
   if (await box.isChecked()) await box.click();
   await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await openPhotos(page);
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 30_000 });
 }
 
@@ -123,8 +123,8 @@ test('le tri est retenu après une nouvelle analyse', async ({ page }) => {
   await openSorter(page, 'Grille');
   await sorter(page).getByRole('button', { name: 'Valider ›' }).click();
   await sorter(page).getByRole('button', { name: 'Retour aux groupes' }).click();
-  await page.getByRole('button', { name: 'Autre dossier' }).click();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await openPhotos(page);
   await expect(page.getByText('rien de nouveau')).toBeVisible();
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 1 groupe sur 2');
   await expect(page.getByRole('button', { name: 'Continuer le tri' })).toBeVisible();
@@ -160,8 +160,8 @@ test('effacer mes choix : tout redevient à trier, rien n’est supprimé', asyn
   await expect(page.getByRole('button', { name: /Supprimer 1 photo/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Effacer tous mes choix/ })).toHaveCount(0);
   // Retenu après rechargement.
-  await page.getByRole('button', { name: 'Autre dossier' }).click();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await openPhotos(page);
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
 });
 

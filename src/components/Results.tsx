@@ -1,6 +1,6 @@
 /**
  * Les résultats, une seule page. En haut : **Doublons | Photos inutiles** (deux fonctions séparées, un clic pour passer
- * de l'une à l'autre ; la dernière ouverte est retenue), « Relancer », « Autre dossier », « Effacer tous mes choix… ».
+ * de l'une à l'autre ; la dernière ouverte est retenue), « Relancer », « Dossiers… », « Effacer tous mes choix… ».
  * En dessous, la fonction choisie (`Space`), avec ses réglages, son tri, sa suppression (`RemoveDialog`) et ses propres
  * choix (`marks`, `junkMarks`).
  *
@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { T, bytes, duration, num } from '../i18n';
-import { buildGroups, DEFAULTS, type Group, type Params } from '../lib/groups';
+import { buildGroups, DEFAULTS, usedRanks, type Group, type Params } from '../lib/groups';
 import { db, type LabelRow, type MarkRow } from '../lib/db';
 import { isSorted, pendingRemoval, type Choice, type Mark, type Pending } from '../lib/choices';
 import { coveringLabels, ignoredKeys, splitIgnored, wrongLabels } from '../lib/ignored';
@@ -17,8 +17,8 @@ import { notify } from '../lib/notify';
 import { sortedStats } from '../lib/stats';
 import { addStats } from '../lib/statsStore';
 import type { ScanResult } from '../lib/scan';
-import { desktop, readRemoveSettings, removeFolder, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
-import { setDisplayRoot } from '../lib/display';
+import { desktop, readRemoveSettings, removeFolders, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
+import { setDisplayRoots } from '../lib/display';
 import { buildJunkGroups, clipScores, junkReasons, JUNK_DEFAULTS, JUNK_REASONS, type JunkParams, type JunkPrompts } from '../lib/junk';
 import junkPrompts from '../lib/junkPrompts.json';
 import { JunkSettings } from './JunkSettings';
@@ -80,7 +80,8 @@ function readJunkParams(): JunkParams {
 interface Report {
   fn: Fn;
   mode: RemoveMode;
-  folder: string;
+  /** Dossiers « À supprimer » qui ont reçu des photos. */
+  folders: string[];
   done: number;
   bytes: number;
   /** Dont copies exactes (stats). */
@@ -95,14 +96,16 @@ interface Report {
 
 interface Props {
   result: ScanResult;
+  /** Absent quand les dossiers ne se relisent pas (champ d'envoi du site). */
   onRescan?: () => void;
-  canRescan: boolean;
-  onAnother: () => void;
-  /** Dossier analysé, dans l'appli PC (pour supprimer) ; `null` sur le site. */
-  root: string | null;
+  onFolders: () => void;
+  /** Noms des dossiers analysés. */
+  names: string[];
+  /** Leurs chemins, dans l'appli PC (pour supprimer) ; aucun sur le site. */
+  roots: string[];
 }
 
-export function Results({ result, onRescan, canRescan, onAnother, root }: Props) {
+export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const [params, setParamsState] = useState<Params>(readParams);
   const [junkParams, setJunkParamsState] = useState<JunkParams>(readJunkParams);
   const [space, setSpace] = useState<Fn>(readSpace);
@@ -115,7 +118,7 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
   const [report, setReport] = useState<Report | null>(null);
   const [removeSettings, setRemoveSettingsState] = useState<RemoveSettings>(readRemoveSettings);
   const { photos } = result;
-  setDisplayRoot(root);
+  setDisplayRoots(roots);
 
   const setParams = (p: Params) => {
     setParamsState(p);
@@ -275,20 +278,21 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
     );
 
   const remove = async () => {
-    if (!desktop || !root || !removing) return;
+    if (!desktop || !roots.length || !removing) return;
     const { fn } = removing;
     const plan = removing.exact ?? pending[fn];
     const targets = plan.remove.map((i) => photos[i]);
     const exactKeys = new Set(plan.plans.filter((p) => p.group.kind === 'exact').flatMap((p) => p.remove.map((i) => photos[i].key)));
     const byPath = new Map(targets.map((p) => [p.path, p]));
-    const folder = removeFolder(removeSettings, root, T.remove.folderName);
-    const r: Report = { fn, mode: removeSettings.mode, folder, done: 0, bytes: 0, exact: 0, moves: [], failedTrash: 0, failedMissing: 0, failedOther: 0 };
+    const { mode, folder } = removeSettings;
+    const folders = removeFolders(removeSettings, usedRanks(targets).map((i) => roots[i]), T.remove.folderName);
+    const r: Report = { fn, mode, folders, done: 0, bytes: 0, exact: 0, moves: [], failedTrash: 0, failedMissing: 0, failedOther: 0 };
     const removed: string[] = [];
     setWorking({ done: 0, total: targets.length });
     try {
       for (let i = 0; i < targets.length; i += REMOVE_BATCH) {
         const batch = targets.slice(i, i + REMOVE_BATCH);
-        const outcomes = await desktop.remove({ root, paths: batch.map((p) => p.path), mode: removeSettings.mode, folder });
+        const outcomes = await desktop.remove({ roots, paths: batch.map((p) => p.path), mode, folder, folderName: T.remove.folderName });
         for (const o of outcomes) {
           const p = byPath.get(o.path)!;
           if (o.ok) {
@@ -346,13 +350,13 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
           ))}
         </h2>
         <span className="spacer" />
-        {canRescan && onRescan && (
+        {onRescan && (
           <button className="secondary" onClick={onRescan}>
             {T.results.rescan}
           </button>
         )}
-        <button className="secondary" onClick={onAnother}>
-          {T.results.another}
+        <button className="secondary" onClick={onFolders}>
+          {T.results.folders}
         </button>
         {(hasChoices('dup') || hasChoices('junk')) && (
           <button className="secondary" onClick={() => setResetting(true)}>
@@ -362,6 +366,7 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
       </div>
       <p className="muted small scan-info">
         <strong data-testid="analyzed">{T.home.analyzed(num(photos.length - gone.size))}</strong> {T.results.elapsed(duration(result.seconds), result.analyzed)}
+        {names.length > 1 && <>{T.results.inFolders(names.join(', '))} </>}
         {skipped > 0 && <> {T.results.skipped(result.unreadable, result.unsupported, result.videos)}</>}
         {result.device && <> {T.results.device(result.device === 'webgpu')}</>}
         {result.clipDevice && <> {T.results.clipDevice(result.clipDevice === 'webgpu')}</>}
@@ -404,7 +409,8 @@ export function Results({ result, onRescan, canRescan, onAnother, root }: Props)
           pending={removing.exact ?? pending[removing.fn]}
           exact={!!removing.exact}
           photos={photos}
-          root={root}
+          names={names}
+          roots={roots}
           settings={removeSettings}
           onSettings={setRemoveSettings}
           working={working}
@@ -429,7 +435,7 @@ function RemoveReport({ report, onUndo, onClose }: { report: Report; onUndo: () 
     <div className="report" role="status" data-testid="remove-report">
       {report.done > 0 && (
         <p>
-          <strong>{T.remove.done(report.done, bytes(report.bytes))}</strong> {report.mode === 'trash' ? T.remove.doneTrash : T.remove.doneFolder(report.folder)}
+          <strong>{T.remove.done(report.done, bytes(report.bytes))}</strong> {report.mode === 'trash' ? T.remove.doneTrash : report.folders.length > 1 ? T.remove.doneFolders(T.remove.folderName) : T.remove.doneFolder(report.folders[0])}
         </p>
       )}
       {report.failedTrash > 0 && <p className="warning">{T.remove.failedTrash(report.failedTrash)}</p>}
@@ -438,8 +444,8 @@ function RemoveReport({ report, onUndo, onClose }: { report: Report; onUndo: () 
       {report.undone !== undefined && <p>{T.remove.undone(report.undone)}</p>}
       <div className="actions-row">
         {report.mode === 'folder' && report.done > 0 && (
-          <button className="secondary" onClick={() => desktop?.showInFolder(report.folder)}>
-            {T.remove.openFolder}
+          <button className="secondary" onClick={() => report.folders.forEach((f) => void desktop?.showInFolder(f))}>
+            {report.folders.length > 1 ? T.remove.openFolders : T.remove.openFolder}
           </button>
         )}
         {report.moves.length > 0 && (

@@ -70,9 +70,9 @@ describe('stats', () => {
     const off = onNotice((n) => seen.push(n.text));
     for (let i = 0; i < 12; i++) addStats({ duels: 1 });
     for (let i = 0; i < 3; i++) countSwipe();
-    countScan(40, 'F:/Photos');
-    countScan(90, 'F:/Photos');
-    countScan(20, 'F:/Autres');
+    countScan(40, ['F:/Photos']);
+    countScan(90, ['F:/Photos']);
+    countScan(20, ['F:/Autres']);
     const { stats, earned } = await readStats();
     expect(stats).toMatchObject({ duels: 12, swipes: 3, swipeMinute: 3, scans: 3, folders: 2, biggestScan: 90, days: 1 });
     expect(Object.keys(earned)).toEqual(['firstDuel']);

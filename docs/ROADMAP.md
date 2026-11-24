@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 23/11/2026 (version 0.7). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 24/11/2026 (version 0.8.1). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -47,10 +47,14 @@
 > (23/11) Essai de la 0.6 : « ça s'ouvre ultra vite ». **Version 0.7** : une seule page (plus de choix doublons / inutiles
 > ni de « Retour » ; « Relancer », « Autre dossier » et « Effacer tous mes choix… » en haut), plus d'installateur.
 >
-> **Reprendre ici** : l'utilisateur choisit la suite. Proposé : d'abord un vrai ménage de ses photos (seule
-> l'utilisation montrera les manques), puis l'**appli Android** (§ 5.3, **rien commencer sans son feu vert**). Petits plus
-> possibles avant, sur PC : plusieurs dossiers à la fois, astuces de première visite et annonce des nouvelles versions
-> (§ 3), vidéos en double (§ 6).
+> (24/11) **Version 0.8** (0.8.1 pour la poignée ; la 0.8.0 n'a pas été publiée), demandée par l'utilisateur : **plusieurs dossiers à la fois** (ARCHITECTURE § 1.1) : liste retenue,
+> doublons d'un dossier à l'autre, copie du dossier le plus haut proposée (ordre à la poignée ⠿, comme Rank It All, demandé
+> pendant le premier essai), « À supprimer » dans chaque dossier.
+>
+> **Reprendre ici** : 0.8 en cours d'essai par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
+> dossiers, l'avertissement pour une sauvegarde. Ensuite, proposé : un vrai ménage de ses photos (seule l'utilisation
+> montrera les manques), puis l'**appli Android** (§ 5.3, **rien commencer sans son feu vert**). Petits plus possibles
+> avant, sur PC : astuces de première visite et annonce des nouvelles versions (§ 3), vidéos en double (§ 6).
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -102,7 +106,8 @@ scène à quelques minutes, copies retouchées).
 - ~~**Ménage des copies exactes** en un bouton~~ — fait le 23/11 (0.5).
 - Site : supprimer aussi (dossier « À supprimer » par la File System Access API en écriture) ? Pas utile tant que le
   site ne sert qu'aux essais.
-- **Plusieurs dossiers à la fois** (deux disques, ou le PC et une clé).
+- ~~**Plusieurs dossiers à la fois**~~ — fait le 24/11 (0.8). Reste, si besoin : déclarer un dossier « sauvegarde » (comparé,
+  jamais supprimé).
 - Exe : signature de code (évite l'avertissement de Windows, payante) ; annonce d'une nouvelle version (un exe portable ne se met pas à jour tout
   seul : prévenir et ouvrir la page des *Releases*). ~~Installateur~~ — fait en 0.5, retiré en 0.7.
 - HEIC (certains téléphones Android aussi) dans l'appli PC : décodage par le processus principal (sharp / libheif), si

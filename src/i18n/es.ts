@@ -11,11 +11,22 @@ export const es: Dict = {
   },
   start: {
     pick: 'Elegir una carpeta de fotos',
-    subfolders: 'Las subcarpetas están incluidas.',
-    resume: (name) => `Retomar «${name}»`,
+    subfolders: 'Las subcarpetas están incluidas. Puedes elegir varias carpetas.',
+    folders: 'Carpetas que analizar',
+    analyze: 'Analizar',
+    add: 'Añadir una carpeta',
+    drop: 'Quitar',
+    moveHint: '⠿ Arrastra una carpeta para subirla o bajarla.',
+    dragTip: 'Arrastrar para mover',
+    move: (name) => `Mover «${name}»`,
+    severalHelp: 'El orden importa: cuando una foto está en varias carpetas, se propone conservar la de la carpeta más alta.',
+    missing: 'No se encuentra por ahora.',
+    covered: (name, by) => (name === by ? `«${name}» ya está en la lista.` : `«${name}» ya está incluida en «${by}».`),
+    replaced: (name, old) => `«${name}» ya incluye ${old}: la sustituye.`,
+    skipped: (name) => `«${name}» no se encuentra o fue denegada: no se ha analizado.`,
     similar: 'Buscar también fotos parecidas',
     similarHelp: (mb) => `Ráfagas, la misma escena fotografiada varias veces. Se descarga un modelo de ${mb} MB la primera vez; tus fotos se quedan aquí.`,
-    noAccess: 'Se denegó el acceso a la carpeta.',
+    noAccess: 'No se pudo abrir ninguna carpeta.',
     junkModel: 'Reconocer también documentos, tiques y memes',
     junkModelHelp: (mb) =>
       `Para las fotos inútiles (las borrosas, oscuras, vacías y capturas de pantalla se buscan siempre). Se descarga un modelo de ${mb} MB como máximo la primera vez.`,
@@ -65,7 +76,8 @@ export const es: Dict = {
     elapsed: (time, analyzed) =>
       analyzed ? `Análisis hecho en ${time} (${analyzed} foto${s(analyzed)} nueva${s(analyzed)}).` : `Análisis hecho en ${time}, nada nuevo.`,
     device: (gpu) => (gpu ? 'Fotos parecidas calculadas con la tarjeta gráfica.' : 'Fotos parecidas calculadas con el procesador, más lento: la tarjeta gráfica no está disponible en este navegador.'),
-    another: 'Otra carpeta',
+    folders: 'Carpetas…',
+    inFolders: (names) => `Carpetas: ${names}.`,
     rescan: 'Volver a analizar',
     junkExtra: 'fotos inútiles',
     clipDevice: (gpu) => (gpu ? 'Fotos inútiles reconocidas por la tarjeta gráfica.' : 'Fotos inútiles reconocidas por el procesador, más lento.'),
@@ -88,6 +100,7 @@ export const es: Dict = {
     suggestion: 'Sugerencia',
     reasons: {
       original: 'la original',
+      folder: 'carpeta prioritaria',
       resolution: 'la más grande',
       sharpness: 'la más nítida',
     },
@@ -163,6 +176,9 @@ export const es: Dict = {
     doneTrash: 'Están en la Papelera de reciclaje de Windows.',
     doneFolder: (path) => `Están en la carpeta «${path}».`,
     openFolder: 'Abrir la carpeta',
+    doneFolders: (name) => `Están en «${name}», dentro de cada carpeta.`,
+    openFolders: 'Abrir las carpetas',
+    inFolder: (n) => (n ? `${n} foto${s(n)} que borrar` : 'nada que borrar'),
     undo: 'Deshacer',
     undone: (n) => `${n} foto${s(n)} devuelta${s(n)} a su sitio.`,
     failedTrash: (n) =>
@@ -210,6 +226,7 @@ export const es: Dict = {
   exact: {
     button: (n, size) => `Borrar todas las copias exactas (${n} foto${s(n)}, ${size})…`,
     note: 'De cada foto con varias copias idénticas solo se conserva la original.',
+    noteFolders: 'De cada foto con varias copias idénticas se conserva una sola: la de la carpeta más alta de la lista. Cuidado si una de las carpetas es una copia de seguridad: sus copias se borrarían.',
   },
   ignored: {
     done: 'Grupo apartado.',

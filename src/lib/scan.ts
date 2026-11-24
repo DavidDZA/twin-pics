@@ -1,5 +1,5 @@
 /**
- * L'analyse d'un dossier, de bout en bout. **Chaque photo n'est lue qu'une fois** sur le disque (un disque dur lit
+ * L'analyse des dossiers, de bout en bout. **Chaque photo n'est lue qu'une fois** sur le disque (un disque dur lit
  * environ 60 à 150 Mo/s : relire le dossier pour un modèle doublait le temps) :
  *
  *   lecture (2 fichiers à la fois) → analyse (un worker par cœur) → modèles (carte graphique, ou processeur)
@@ -92,7 +92,7 @@ function forcedDevice(): 'auto' | 'wasm' {
   }
 }
 
-function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string | undefined): PhotoInfo {
+function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string | undefined, rank: number | undefined): PhotoInfo {
   return {
     key: row.key,
     path: row.path,
@@ -109,6 +109,7 @@ function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string 
     camera: row.camera,
     quality: row.quality,
     clip: clipModelId && row.clipModel === clipModelId ? row.clip : undefined,
+    rank,
   };
 }
 
@@ -372,7 +373,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   // Paires candidates.
   const dinoId = dino ? dino.model?.id : opts.similar ? known.dino?.id : undefined;
   const clipModelId = clip ? clip.model?.id : opts.junkModel ? known.clip?.id : undefined;
-  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dinoId, clipModelId));
+  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dinoId, clipModelId, entries.get(r.key)?.rank));
   onProgress({ phase: 'pairs', done: 0, total: photos.length });
   const pairs = await computePairs(photos, signal);
 

@@ -10,12 +10,23 @@ export const fr = {
   },
   start: {
     pick: 'Choisir un dossier de photos',
-    subfolders: 'Les sous-dossiers sont compris.',
-    resume: (name: string) => `Reprendre « ${name} »`,
+    subfolders: 'Les sous-dossiers sont compris. Tu peux choisir plusieurs dossiers.',
+    folders: 'Dossiers à analyser',
+    analyze: 'Analyser',
+    add: 'Ajouter un dossier',
+    drop: 'Retirer',
+    moveHint: '⠿ Glisse un dossier pour le monter ou le descendre.',
+    dragTip: 'Glisser pour déplacer',
+    move: (name: string) => `Déplacer « ${name} »`,
+    severalHelp: 'L’ordre compte : quand une photo est dans plusieurs dossiers, c’est celle du dossier le plus haut qui est proposée à garder.',
+    missing: 'Introuvable pour l’instant.',
+    covered: (name: string, by: string) => (name === by ? `« ${name} » est déjà dans la liste.` : `« ${name} » est déjà compris dans « ${by} ».`),
+    replaced: (name: string, old: string) => `« ${name} » comprend déjà ${old} : il le remplace.`,
+    skipped: (name: string) => `« ${name} » est introuvable ou refusé : pas analysé.`,
     similar: 'Chercher aussi les photos similaires',
     similarHelp: (mb: number) =>
       `Rafales, même scène prise plusieurs fois. Un modèle de ${mb} Mo est téléchargé la première fois ; tes photos, elles, restent ici.`,
-    noAccess: 'L’accès au dossier a été refusé.',
+    noAccess: 'Aucun dossier n’a pu être ouvert.',
     junkModel: 'Reconnaître aussi les documents, tickets et mèmes',
     junkModelHelp: (mb: number) =>
       `Pour les photos inutiles (les floues, sombres, vides et captures d’écran sont toujours cherchées). Un modèle de ${mb} Mo au plus est téléchargé la première fois.`,
@@ -66,7 +77,8 @@ export const fr = {
       analyzed ? `Analyse faite en ${time} (${analyzed} photo${s(analyzed)} nouvelle${s(analyzed)}).` : `Analyse faite en ${time}, rien de nouveau.`,
     device: (gpu: boolean): string =>
       gpu ? 'Photos similaires calculées par la carte graphique.' : 'Photos similaires calculées par le processeur, plus lent : la carte graphique n’est pas disponible dans ce navigateur.',
-    another: 'Autre dossier',
+    folders: 'Dossiers…',
+    inFolders: (names: string) => `Dossiers : ${names}.`,
     rescan: 'Relancer',
     junkExtra: 'photos inutiles',
     clipDevice: (gpu: boolean): string => (gpu ? 'Photos inutiles reconnues par la carte graphique.' : 'Photos inutiles reconnues par le processeur, plus lent.'),
@@ -89,6 +101,7 @@ export const fr = {
     suggestion: 'Suggestion',
     reasons: {
       original: 'l’originale',
+      folder: 'dossier prioritaire',
       resolution: 'la plus grande',
       sharpness: 'la plus nette',
     },
@@ -164,6 +177,9 @@ export const fr = {
     doneTrash: 'Elles sont dans la Corbeille de Windows.',
     doneFolder: (path: string) => `Elles sont dans le dossier « ${path} ».`,
     openFolder: 'Ouvrir le dossier',
+    doneFolders: (name: string) => `Elles sont dans « ${name} », dans chaque dossier.`,
+    openFolders: 'Ouvrir les dossiers',
+    inFolder: (n: number) => (n ? `${n} photo${s(n)} à supprimer` : 'rien à supprimer'),
     undo: 'Annuler',
     undone: (n: number) => (n > 1 ? `${n} photos remises à leur place.` : `${n} photo remise à sa place.`),
     failedTrash: (n: number) =>
@@ -211,6 +227,7 @@ export const fr = {
   exact: {
     button: (n: number, size: string) => `Supprimer toutes les copies exactes (${n} photo${s(n)}, ${size})…`,
     note: 'Pour chaque photo en plusieurs exemplaires identiques, seule l’originale est gardée.',
+    noteFolders: 'Pour chaque photo en plusieurs exemplaires identiques, une seule est gardée : celle du dossier le plus haut dans la liste. Attention si l’un des dossiers est une sauvegarde : ses copies seraient supprimées.',
   },
   ignored: {
     done: 'Groupe mis de côté.',

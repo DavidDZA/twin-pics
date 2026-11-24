@@ -8,6 +8,8 @@ export interface ListedFile {
   path: string;
   size: number;
   lastModified: number;
+  /** Rang du dossier analysé d'où elle vient. */
+  root: number;
 }
 
 export interface DesktopListing {
@@ -20,12 +22,13 @@ export interface DesktopListing {
 export type RemoveMode = 'trash' | 'folder';
 
 export interface RemoveRequest {
-  /** Dossier analysé : la structure des sous-dossiers est gardée dans le dossier « À supprimer ». */
-  root: string;
+  /** Dossiers analysés : la structure des sous-dossiers est gardée dans le dossier « À supprimer ». */
+  roots: string[];
   paths: string[];
   mode: RemoveMode;
-  /** Dossier « À supprimer » (mode `folder`). */
-  folder?: string;
+  /** Dossier « À supprimer » choisi (mode `folder`) ; vide : un dans chaque dossier analysé, nommé `folderName`. */
+  folder: string;
+  folderName: string;
 }
 
 /**
@@ -47,17 +50,18 @@ export interface Move {
 }
 
 export interface DesktopApi {
-  /** Fenêtre de choix d'un dossier de photos ; `null` si annulée. */
-  pickFolder(): Promise<string | null>;
-  /** Le dernier dossier analysé, s'il existe encore. */
-  lastFolder(): Promise<string | null>;
-  /** Rouvre un dossier déjà choisi (« Reprendre ») ; `false` s'il n'existe plus. */
-  openFolder(path: string): Promise<boolean>;
+  /** Fenêtre de choix d'un ou plusieurs dossiers de photos ; aucun si annulée. */
+  pickFolders(): Promise<string[]>;
+  /** Les dossiers de la dernière fois ; `missing` : introuvable pour l'instant (clé USB débranchée). */
+  lastFolders(): Promise<{ path: string; missing: boolean }[]>;
+  saveFolders(paths: string[]): Promise<void>;
+  /** Rouvre des dossiers déjà choisis : ceux qui existent encore. */
+  openFolders(paths: string[]): Promise<string[]>;
   /**
-   * Les photos d'un dossier choisi, sous-dossiers compris, sauf `exclude` (le dossier « À supprimer ») ;
+   * Les photos des dossiers choisis, sous-dossiers compris, sauf `exclude` (le dossier « À supprimer ») ;
    * `onListProgress` donne le nombre trouvé.
    */
-  list(root: string, exclude?: string[]): Promise<DesktopListing>;
+  list(roots: string[], exclude?: string[]): Promise<DesktopListing>;
   onListProgress(listener: (found: number) => void): () => void;
   /** Fenêtre de choix du dossier « À supprimer ». */
   pickRemoveFolder(defaultPath?: string): Promise<string | null>;

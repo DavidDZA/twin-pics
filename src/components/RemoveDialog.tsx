@@ -6,9 +6,9 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, bytes } from '../i18n';
-import type { PhotoInfo } from '../lib/groups';
+import { usedRanks, type PhotoInfo } from '../lib/groups';
 import type { GroupPlan, Pending } from '../lib/choices';
-import { RELEASES_URL, desktop, removeFolder, type RemoveSettings } from '../platform';
+import { RELEASES_URL, desktop, removeFolders, type RemoveSettings } from '../platform';
 import { useThumbs } from './useThumbs';
 import { shortPath } from '../lib/display';
 
@@ -20,8 +20,9 @@ interface Props {
   /** Toutes les copies exactes d'un coup (sans tri) : la fenêtre le rappelle. */
   exact: boolean;
   photos: PhotoInfo[];
-  /** Dossier analysé (appli PC) ; `null` sur le site. */
-  root: string | null;
+  /** Dossiers analysés : leurs noms et, dans l'appli PC, leurs chemins (aucun sur le site). */
+  names: string[];
+  roots: string[];
   settings: RemoveSettings;
   onSettings: (s: RemoveSettings) => void;
   /** Pendant la suppression : photos faites / total. */
@@ -30,9 +31,11 @@ interface Props {
   onConfirm: () => void;
 }
 
-export function RemoveDialog({ pending, exact, photos, root, settings, onSettings, working, onCancel, onConfirm }: Props) {
-  const canRemove = !!desktop && !!root;
-  const folder = root ? removeFolder(settings, root, T.remove.folderName) : '';
+export function RemoveDialog({ pending, exact, photos, names, roots, settings, onSettings, working, onCancel, onConfirm }: Props) {
+  const canRemove = !!desktop && roots.length > 0;
+  const targets = pending.remove.map((i) => photos[i]);
+  const ranks = usedRanks(targets);
+  const folders = removeFolders(settings, roots.length ? ranks.map((i) => roots[i]) : [], T.remove.folderName);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !working && onCancel();
@@ -41,7 +44,7 @@ export function RemoveDialog({ pending, exact, photos, root, settings, onSetting
   }, [onCancel, working]);
 
   const chooseFolder = async () => {
-    const picked = await desktop?.pickRemoveFolder(folder);
+    const picked = await desktop?.pickRemoveFolder(folders[0]);
     if (picked) onSettings({ ...settings, folder: picked });
   };
 
@@ -52,7 +55,16 @@ export function RemoveDialog({ pending, exact, photos, root, settings, onSetting
         <p data-testid="remove-summary">
           <strong>{T.remove.summary(pending.remove.length, bytes(pending.bytes), pending.keep, pending.plans.length)}</strong>
         </p>
-        {exact && <p>{T.exact.note}</p>}
+        {names.length > 1 && (
+          <ul className="by-folder" data-testid="by-folder">
+            {names.map((name, i) => (
+              <li key={i}>
+                <strong>{name}</strong> {T.remove.inFolder(targets.filter((p) => (p.rank ?? 0) === i).length)}
+              </li>
+            ))}
+          </ul>
+        )}
+        {exact && <p>{names.length > 1 ? T.exact.noteFolders : T.exact.note}</p>}
         {pending.noneKept > 0 && (
           <p className="warning" role="alert">
             {T.remove.noneKept(pending.noneKept)}
@@ -78,8 +90,12 @@ export function RemoveDialog({ pending, exact, photos, root, settings, onSetting
             {settings.mode === 'trash' ? (
               <p className="muted small">{T.remove.trashHelp}</p>
             ) : (
-              <div className="folder-choice">
-                <code title={folder}>{folder}</code>
+              <div className={folders.length > 1 ? 'folder-choice several' : 'folder-choice'}>
+                {folders.map((f) => (
+                  <code key={f} title={f}>
+                    {f}
+                  </code>
+                ))}
                 <button className="secondary" onClick={chooseFolder} disabled={!!working}>
                   {T.remove.change}
                 </button>

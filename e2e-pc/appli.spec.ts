@@ -1,8 +1,8 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { PHOTOS_DIR } from '../e2e/photos';
+import { delimiter, join, resolve } from 'node:path';
+import { KEY_DIR, PHOTOS_DIR } from '../e2e/photos';
 
 /**
  * L'appli PC de bout en bout : dossier choisi (la fenêtre de choix est remplacée par TP_PICK_FOLDER), analyse, tri
@@ -54,6 +54,7 @@ async function analyze(open: 'doublons' | 'photos inutiles' = 'doublons') {
   if (await box.isChecked()) await box.click();
   await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
   await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
+  await page.getByRole('button', { name: 'Analyser' }).click();
   await expect(page.getByTestId('analyzed')).toHaveText('15 photos analysées.', { timeout: 30_000 });
   if (open === 'photos inutiles') await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
 }
@@ -219,6 +220,7 @@ test('appli PC : photos similaires sur la carte graphique (E2E_MODELE=1 : télé
   test.setTimeout(240_000);
   await launch();
   await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
+  await page.getByRole('button', { name: 'Analyser' }).click();
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 200_000 });
   await expect(page.getByText(/Photos similaires calculées par (la carte graphique|le processeur)/)).toBeVisible();
   console.log(await page.getByText(/Photos similaires calculées par/).textContent());
@@ -249,11 +251,67 @@ test('appli PC : garder plusieurs photos, tout supprimer, tri retenu au lancemen
   await expect(page.getByRole('dialog', { name: 'Avant de supprimer' }).getByText('Attention : dans 1 groupe, tu ne gardes aucune photo.')).toBeVisible();
   await page.getByRole('button', { name: 'Annuler' }).click();
 
-  // Lancement suivant : « Reprendre », le tri est retenu.
+  // Lancement suivant : le dossier et le tri sont retenus.
   await app.close();
   await launch();
-  await page.getByRole('button', { name: 'Reprendre « Mes photos »' }).click();
+  await expect(page.getByTestId('folders').locator('strong')).toHaveText(['Mes photos']);
+  await page.getByRole('button', { name: 'Analyser' }).click();
   await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 2 groupes sur 2');
   await expect(page.getByRole('button', { name: /Supprimer 3 photos/ })).toBeVisible();
+});
+
+test('appli PC : plusieurs dossiers, « À supprimer » dans chacun, annulation, liste retenue, clé débranchée', async () => {
+  const key = join(dir, 'Clé');
+  cpSync(KEY_DIR, key, { recursive: true });
+  // Trois dossiers choisis d'un coup : le sous-dossier, déjà compris, n'est pas ajouté.
+  await launch({ TP_PICK_FOLDER: [photos, join(photos, 'Vacances'), key].join(delimiter) });
+  for (const name of [/photos similaires/, /documents, tickets et mèmes/]) await page.getByRole('checkbox', { name }).uncheck();
+  await page.getByRole('button', { name: 'Choisir un dossier de photos' }).click();
+  await expect(page.getByText('« Vacances » est déjà compris dans « Mes photos ».')).toBeVisible();
+  const names = () => page.getByTestId('folders').locator('strong');
+  await expect(names()).toHaveText(['Mes photos', 'Clé']);
+  await page.screenshot({ path: join(SHOTS, 'pc-dossiers.png') });
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByTestId('analyzed')).toHaveText('18 photos analysées.', { timeout: 30_000 });
+  await expect(page.getByTestId('group').filter({ hasText: 'montagne.jpg' }).locator('li.best')).toContainText('Mes photos/Vacances');
+
+  // Copies exactes : 2 dans « Mes photos », 2 sur la clé.
+  await page.getByRole('button', { name: /Supprimer toutes les copies exactes \(4 photos/ }).click();
+  const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
+  await expect(modal.getByTestId('by-folder').locator('li')).toHaveText(['Mes photos 2 photos à supprimer', 'Clé 2 photos à supprimer']);
+  await modal.getByRole('combobox', { name: 'Où vont les photos supprimées' }).selectOption('folder');
+  await expect(modal.locator('code')).toHaveText([/Mes photos\/Twin Pics - À supprimer$/, /Clé\/Twin Pics - À supprimer$/]);
+  await page.screenshot({ path: join(SHOTS, 'pc-dossiers-supprimer.png') });
+  await modal.getByRole('button', { name: 'Supprimer 4 photos' }).click();
+  const report = page.getByTestId('remove-report');
+  await expect(report).toContainText('4 photos supprimées');
+  await expect(report.getByRole('button', { name: 'Ouvrir les dossiers' })).toBeVisible();
+  const bin = 'Twin Pics - À supprimer';
+  expect(readdirSync(join(key, bin, 'Sauvegarde')).sort()).toEqual(['chat.jpg', 'montagne.jpg']);
+  expect(existsSync(join(photos, bin, 'Animaux', 'chat - Copie.jpg'))).toBe(true);
+  expect(existsSync(join(photos, 'Vacances', 'montagne.jpg'))).toBe(true);
+  await report.getByRole('button', { name: 'Annuler' }).click();
+  await expect(report).toContainText('4 photos remises à leur place.');
+  expect(existsSync(join(key, 'Sauvegarde', 'montagne.jpg'))).toBe(true);
+
+  // Lancement suivant : les deux dossiers sont là ; la clé débranchée est signalée, l'autre dossier s'analyse.
+  await app.close();
+  rmSync(key, { recursive: true });
+  await launch();
+  await expect(names()).toHaveText(['Mes photos', 'Clé']);
+  await expect(page.getByText('Introuvable pour l’instant.')).toBeVisible();
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByText('« Clé » est introuvable ou refusé : pas analysé.')).toBeVisible();
+  await expect(page.getByTestId('analyzed')).toHaveText('15 photos analysées.', { timeout: 30_000 });
+  // Elle reste dans la liste pour la prochaine fois.
+  await page.getByRole('button', { name: 'Dossiers…' }).click();
+  await expect(names()).toHaveText(['Mes photos', 'Clé']);
+});
+
+test('appli PC : le dossier retenu par une version d’avant la 0.8 est repris', async () => {
+  mkdirSync(join(dir, 'appli'));
+  writeFileSync(join(dir, 'appli', 'reglages.json'), JSON.stringify({ lastFolder: photos }));
+  await launch();
+  await expect(page.getByTestId('folders').locator('strong')).toHaveText(['Mes photos']);
 });

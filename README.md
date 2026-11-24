@@ -4,8 +4,8 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.7, 23/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
-**photos inutiles** (floues, ratées, captures d'écran, documents…) d'un dossier. Elle les fait trier (garder une photo,
+**État : appli PC** (version 0.8, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
+**photos inutiles** (floues, ratées, captures d'écran, documents…) d'un ou plusieurs dossiers. Elle les fait trier (garder une photo,
 plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le site web reste là pour essayer (il
 trouve et trie, il ne supprime pas). L'appli Android viendra ensuite. Pas de version Mac ni iPhone.
 
@@ -28,20 +28,22 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin.Pics.0.7.0.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.8.1.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest). Rien à installer : la première ouverture se
    décompresse (une barre, 10 à 35 s), les suivantes sont immédiates (l'appli reste dans
    `%LOCALAPPDATA%\Twin Pics Portable`). Windows peut afficher « Windows a protégé votre ordinateur » (appli non
    signée) : *Informations complémentaires → Exécuter quand même*. Sur le PC de développement, chaque version est aussi
    construite dans le dossier `release/` du projet (hors du dépôt).
    Pour essayer sans rien installer : le [site](https://daviddza.github.io/twin-pics/), dans Chrome ou Edge.
-2. « Choisir un dossier de photos » (sous-dossiers compris). La première analyse lit toutes les photos ; les suivantes
-   ne relisent que les nouvelles (« Reprendre » rouvre le dernier dossier). Les photos HEIC (iPhone) et les vidéos ne
+2. « Choisir un dossier de photos » (sous-dossiers compris), « Ajouter un dossier » pour en analyser **plusieurs à la
+   fois** (deux disques, le PC et une clé…), puis « Analyser ». La liste est retenue ; un dossier débranché y reste,
+   signalé. Les doublons d'un dossier à l'autre sont trouvés ; entre deux copies, celle du **dossier le plus haut**
+   est proposée (poignée ⠿ pour ranger la liste). La première analyse lit toutes les photos ; les suivantes ne relisent que les nouvelles. Les photos HEIC (iPhone) et les vidéos ne
    sont pas encore analysées. Sur un disque dur, la vitesse du disque fixe la durée (environ 15 min pour 56 Go).
-   Ensuite, en haut : **Doublons | Photos inutiles** (un clic passe de l'une à l'autre), « Relancer », « Autre dossier »
-   et « Effacer tous mes choix… ».
+   Ensuite, en haut : **Doublons | Photos inutiles** (un clic passe de l'une à l'autre), « Relancer », « Dossiers… » (la
+   liste) et « Effacer tous mes choix… ».
 3. **Toutes les copies exactes en un bouton** (page des doublons) : on garde l'originale de chaque photo, après le
-   récapitulatif habituel. Les groupes déjà triés à la main ne sont pas touchés.
+   récapitulatif habituel (qui compte ce qui part de chaque dossier). Les groupes déjà triés à la main ne sont pas touchés.
 4. **Trier les doublons**, groupe par groupe. Par défaut on ne garde que la suggestion ; on peut en garder plusieurs,
    ou aucune. Deux façons, au choix (bouton « Affichage ») :
    - **Grille** (PC) : tout le groupe à l'écran ; un clic sur une photo la garde ou la supprime (touches 1 à 9,
@@ -59,7 +61,7 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
    tout à trier (aucune photo n'est touchée).
 5. **Supprimer n photos** : une fenêtre récapitule, groupe par groupe, ce qui est gardé et supprimé (et prévient si un
    groupe n'en garde aucune). Les photos vont, au choix, dans la **Corbeille de Windows** ou dans un **dossier « À
-   supprimer »** (rangées avec leurs sous-dossiers, annulable juste après). Sur un disque sans Corbeille (clé USB),
+   supprimer »** (un dans chaque dossier analysé, ou un seul au choix ; rangées avec leurs sous-dossiers, annulable juste après). Sur un disque sans Corbeille (clé USB),
    l'appli ne touche à rien et le dit.
 6. **Stats et badges** (en haut) : photos analysées, triées, supprimées, place libérée, et cinquante badges.
 

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { join } from 'node:path';
-import { PHOTOS_DIR } from './photos';
+import { openPhotos } from './photos';
 
 /**
  * Photos inutiles sur le site (téléphone et PC), sans le modèle (règles simples) : dossier d'essai `Ratées` — deux
@@ -17,7 +17,7 @@ async function analyze(page: Page, junkModel = false, open = true) {
   const box = page.getByRole('checkbox', { name: /documents, tickets et mèmes/ });
   if (junkModel) await box.check();
   else await box.uncheck();
-  await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+  await openPhotos(page);
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: junkModel ? 200_000 : 30_000 });
   if (open) await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
 }
@@ -192,8 +192,8 @@ test.describe('modèle des photos inutiles (téléchargé : E2E_MODELE=1)', () =
     // Relancer ne recharge aucun modèle (rien de nouveau à reconnaître), mais garde ce qu'il avait reconnu.
     const workers: string[] = [];
     page.on('worker', (w) => workers.push(w.url()));
-    await page.getByRole('button', { name: 'Autre dossier' }).click();
-    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await page.getByRole('button', { name: 'Dossiers…' }).click();
+    await openPhotos(page);
     await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 30_000 });
     expect(workers.filter((u) => /clip|embed/.test(u))).toEqual([]);
     await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
@@ -224,8 +224,8 @@ test.describe('modèle des photos inutiles (téléchargé : E2E_MODELE=1)', () =
       (window as unknown as { seen: string }).seen = '';
       new MutationObserver(() => ((window as unknown as { seen: string }).seen += document.querySelector('.scan h2')?.textContent ?? '')).observe(document.body, { childList: true, subtree: true, characterData: true });
     });
-    await page.getByRole('button', { name: 'Autre dossier' }).click();
-    await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
+    await page.getByRole('button', { name: 'Dossiers…' }).click();
+    await openPhotos(page);
     await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 120_000 });
     const seen = await page.evaluate(() => (window as unknown as { seen: string }).seen);
     expect(seen).toContain('Préparation du modèle');

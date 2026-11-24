@@ -47,6 +47,8 @@ export interface PhotoInfo {
   quality?: Quality;
   /** Vecteur MobileCLIP, normalisé (photos inutiles). */
   clip?: Float32Array;
+  /** Rang de son dossier parmi les dossiers analysés (0 : le plus haut, dont on garde les copies). */
+  rank?: number;
 }
 
 export interface Pair {
@@ -151,7 +153,7 @@ export function findPairs(photos: PhotoInfo[], limits: Params = LIMITS): Pair[] 
 }
 
 /** Pourquoi la photo suggérée est proposée. */
-export type BestReason = 'original' | 'resolution' | 'sharpness';
+export type BestReason = 'original' | 'folder' | 'resolution' | 'sharpness';
 
 export interface Group {
   /** Identifiant stable : dépend seulement des photos du groupe. */
@@ -173,20 +175,30 @@ export interface Group {
 /** Dossiers et noms qui trahissent une copie (messageries, téléchargements, « (1) », « - Copie »). */
 const COPY_HINTS = /whatsapp|telegram|messenger|signal|snapchat|download|t[ée]l[ée]charg|copie|copy|\(\d+\)|-\d+\.\w+$/i;
 
+const rankOf = (p: PhotoInfo) => p.rank ?? 0;
+
 function copyPenalty(p: PhotoInfo): number {
   return COPY_HINTS.test(p.path) ? 1 : 0;
 }
 
-/** Comparaison « laquelle est l'originale ? » : pas dans un dossier de messagerie, la plus ancienne, le chemin le plus court. */
+/**
+ * Comparaison « laquelle est l'originale ? » : dans le dossier le plus haut (l'ordre choisi par l'utilisateur), pas dans un
+ * dossier de messagerie, la plus ancienne, le chemin le plus court.
+ */
 function compareOriginal(a: PhotoInfo, b: PhotoInfo): number {
-  return copyPenalty(a) - copyPenalty(b) || a.lastModified - b.lastModified || a.path.length - b.path.length || a.path.localeCompare(b.path);
+  return rankOf(a) - rankOf(b) || copyPenalty(a) - copyPenalty(b) || a.lastModified - b.lastModified || a.path.length - b.path.length || a.path.localeCompare(b.path);
+}
+
+/** Dossiers (leurs rangs) d'où viennent ces photos, dans l'ordre. */
+export function usedRanks(photos: PhotoInfo[]): number[] {
+  return [...new Set(photos.map(rankOf))].sort((a, b) => a - b);
 }
 
 const pixels = (p: PhotoInfo) => (p.width ?? 0) * (p.height ?? 0);
 
 /**
  * La photo à garder, proposée (l'utilisateur décide) :
- * - copies exactes : l'originale (pas celle de WhatsApp, la plus ancienne) ;
+ * - copies exactes : celle du dossier le plus haut, sinon l'originale (pas celle de WhatsApp, la plus ancienne) ;
  * - quasi identiques : la plus grande (définition), puis le plus gros fichier (moins compressé) ;
  * - similaires : la plus nette.
  */
@@ -199,10 +211,12 @@ export function suggestBest(photos: PhotoInfo[], members: number[], kind: DupKin
     return compareOriginal(a, b);
   });
   const best = sorted[0];
-  if (kind === 'exact') return { best, reason: 'original' };
+  // Copies de plusieurs dossiers : c'est l'ordre des dossiers qui a choisi.
+  const original = members.some((i) => rankOf(photos[i]) !== rankOf(photos[best])) ? 'folder' : 'original';
+  if (kind === 'exact') return { best, reason: original };
   if (kind === 'near') {
     const tie = members.every((i) => pixels(photos[i]) === pixels(photos[best]));
-    return { best, reason: tie ? 'original' : 'resolution' };
+    return { best, reason: tie ? original : 'resolution' };
   }
   return { best, reason: 'sharpness' };
 }

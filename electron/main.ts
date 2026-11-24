@@ -7,15 +7,15 @@
  * sont lues par `app://twin-pics/_photo/<chemin>`, seulement dans les dossiers choisis par l'utilisateur.
  *
  * Variables d'environnement (tests) : TP_USER_DATA (dossier de l'appli), TP_PICK_FOLDER et TP_PICK_REMOVE_FOLDER
- * (réponses des fenêtres de choix de dossier, qui ne s'automatisent pas), TP_FAKE_TRASH (dossier qui remplace la
+ * (réponses des fenêtres de choix de dossier, qui ne s'automatisent pas ; plusieurs dossiers séparés par « ; »), TP_FAKE_TRASH (dossier qui remplace la
  * Corbeille), VITE_DEV_URL (interface servie par Vite en développement).
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, shell } from 'electron';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { basename, extname, join, normalize, sep } from 'node:path';
+import { basename, delimiter, extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Move, RemoveRequest } from '../src/platform/bridge';
-import { listFolder } from './list';
+import { listFolders } from './list';
 import { insideAny, toNative, toSlash } from './paths';
 import { moveFile, freePath, removePhotos, restorePhotos } from './remove';
 
@@ -30,6 +30,8 @@ const DIST = join(app.getAppPath(), 'dist');
 const settingsFile = () => join(app.getPath('userData'), 'reglages.json');
 
 interface Settings {
+  /** Dossiers de la dernière fois, dans l'ordre ; `lastFolder` : le seul, jusqu'à la 0.7. */
+  folders?: string[];
   lastFolder?: string;
 }
 
@@ -124,10 +126,16 @@ function createWindow(): void {
   win.on('closed', () => (win = null));
 }
 
-async function pickDirectory(title: string, defaultPath?: string, env?: string): Promise<string | null> {
-  if (env && process.env[env]) return process.env[env]!;
-  const r = await dialog.showOpenDialog(win!, { title, defaultPath, properties: ['openDirectory', 'createDirectory'] });
-  return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+async function pickDirectories(title: string, defaultPath: string | undefined, env: string, several: boolean): Promise<string[]> {
+  const answer = process.env[env];
+  if (answer) return several ? answer.split(delimiter) : [answer];
+  const r = await dialog.showOpenDialog(win!, { title, defaultPath, properties: ['openDirectory', 'createDirectory', ...(several ? ['multiSelections' as const] : [])] });
+  return r.canceled ? [] : r.filePaths;
+}
+
+function savedFolders(): string[] {
+  const { folders, lastFolder } = readSettings();
+  return folders ?? (lastFolder ? [lastFolder] : []);
 }
 
 /** Corbeille de Windows, ou dossier d'essai (TP_FAKE_TRASH) pour les tests. */
@@ -140,33 +148,29 @@ async function trash(path: string): Promise<void> {
 
 function registerIpc(): void {
   ipcMain.handle('folder:pick', async () => {
-    const path = await pickDirectory('Dossier de photos', readSettings().lastFolder, 'TP_PICK_FOLDER');
-    if (!path) return null;
-    allow(path);
-    writeSettings({ lastFolder: path });
-    return toSlash(toNative(path));
+    const paths = await pickDirectories('Dossiers de photos', savedFolders().at(-1), 'TP_PICK_FOLDER', true);
+    for (const p of paths) allow(p);
+    return paths.map((p) => toSlash(toNative(p)));
   });
-  ipcMain.handle('folder:last', () => {
-    const last = readSettings().lastFolder;
-    return last && existsSync(last) ? toSlash(toNative(last)) : null;
+  ipcMain.handle('folder:last', () => savedFolders().map((p) => ({ path: toSlash(toNative(p)), missing: !existsSync(p) })));
+  ipcMain.handle('folder:save', (_e, paths: string[]) => writeSettings({ folders: paths.map(toNative), lastFolder: undefined }));
+  ipcMain.handle('folder:open', (_e, paths: string[]) => {
+    const found = paths.filter((p) => existsSync(toNative(p)));
+    for (const p of found) allow(p);
+    return found;
   });
-  ipcMain.handle('folder:open', (_e, path: string) => {
-    if (!existsSync(toNative(path))) return false;
-    allow(path);
-    writeSettings({ lastFolder: toNative(path) });
-    return true;
-  });
-  ipcMain.handle('folder:list', (e, root: string, exclude: string[] = []) => {
-    if (!insideAny(roots, root)) throw new Error('dossier non choisi');
-    return listFolder(toNative(root), (found) => e.sender.send('list:progress', found), exclude.map(toNative));
+  ipcMain.handle('folder:list', (e, folders: string[], exclude: string[] = []) => {
+    if (!folders.every((r) => insideAny(roots, r))) throw new Error('dossier non choisi');
+    return listFolders(folders.map(toNative), (found) => e.sender.send('list:progress', found), exclude.map(toNative));
   });
   ipcMain.handle('remove-folder:pick', async (_e, defaultPath?: string) => {
-    const path = await pickDirectory('Dossier « À supprimer »', defaultPath && existsSync(toNative(defaultPath)) ? toNative(defaultPath) : undefined, 'TP_PICK_REMOVE_FOLDER');
+    const start = defaultPath && existsSync(toNative(defaultPath)) ? toNative(defaultPath) : undefined;
+    const [path] = await pickDirectories('Dossier « À supprimer »', start, 'TP_PICK_REMOVE_FOLDER', false);
     return path ? toSlash(toNative(path)) : null;
   });
   ipcMain.handle('photos:remove', (_e, req: RemoveRequest) => {
-    if (!insideAny(roots, req.root)) throw new Error('dossier non choisi');
-    if (req.folder) removeFolders.add(toNative(req.folder));
+    if (!req.roots.every((r) => insideAny(roots, r))) throw new Error('dossier non choisi');
+    for (const f of req.folder ? [req.folder] : req.roots.map((r) => join(toNative(r), req.folderName))) removeFolders.add(toNative(f));
     return removePhotos(req, { trash });
   });
   ipcMain.handle('photos:restore', (_e, moves: Move[]) => {

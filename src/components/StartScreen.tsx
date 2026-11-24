@@ -1,41 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { T } from '../i18n';
-import { getMeta } from '../lib/db';
 import { EMBED_SIZE_MB } from '../lib/model';
 import { CLIP_CPU_MB } from '../lib/junk';
-import { nameOf } from '../lib/filetypes';
+import type { Folder } from '../lib/folders';
 import { RELEASES_URL, desktop } from '../platform';
+import { FolderList } from './FolderList';
 import { TwinCards } from './TwinCards';
 
 interface Props {
   canPick: boolean;
+  /** Les dossiers à analyser, dans l'ordre (retenus d'une fois à l'autre). */
+  folders: Folder[];
+  onFolders: (list: Folder[]) => void;
   similar: boolean;
   onSimilar: (v: boolean) => void;
   junkModel: boolean;
   onJunkModel: (v: boolean) => void;
   onPick: () => void;
   onFiles: (files: File[]) => void;
-  /** Le dernier dossier : son accès (site, File System Access API) ou son chemin (appli PC). */
-  onResume: (last: FileSystemDirectoryHandle | string) => void;
+  onAnalyze: () => void;
   error?: string;
 }
 
-export function StartScreen({ canPick, similar, onSimilar, junkModel, onJunkModel, onPick, onFiles, onResume, error }: Props) {
-  const [last, setLast] = useState<FileSystemDirectoryHandle | string | null>(null);
+export function StartScreen({ canPick, folders, onFolders, similar, onSimilar, junkModel, onJunkModel, onPick, onFiles, onAnalyze, error }: Props) {
   const input = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (desktop) {
-      desktop.lastFolder().then(setLast, () => setLast(null));
-      return;
-    }
-    if (!canPick) return;
-    getMeta<FileSystemDirectoryHandle>('folder')
-      .then((h) => setLast(h ?? null))
-      .catch(() => setLast(null));
-  }, [canPick]);
-
-  const lastName = typeof last === 'string' ? nameOf(last.replace(/\/$/, '')) || last : last?.name;
+  const pick = canPick ? onPick : () => input.current?.click();
 
   return (
     <section className="start">
@@ -43,9 +32,16 @@ export function StartScreen({ canPick, similar, onSimilar, junkModel, onJunkMode
       <p className="lead">{T.app.tagline}</p>
       <p className="muted">{T.app.privacy}</p>
 
+      {folders.length > 0 && <FolderList folders={folders} onFolders={onFolders} />}
+
       <div className="start-actions">
-        <button className="primary" onClick={canPick ? onPick : () => input.current?.click()}>
-          {T.start.pick}
+        {folders.length > 0 && (
+          <button className="primary" onClick={onAnalyze}>
+            {T.start.analyze}
+          </button>
+        )}
+        <button className={folders.length ? 'secondary' : 'primary'} onClick={pick}>
+          {folders.length ? T.start.add : T.start.pick}
         </button>
         {/* Champ d'envoi de dossier : pour les navigateurs sans File System Access API (et les tests du site). */}
         <input
@@ -57,14 +53,10 @@ export function StartScreen({ canPick, similar, onSimilar, junkModel, onJunkMode
           {...{ webkitdirectory: '' }}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
             if (files.length) onFiles(files);
           }}
         />
-        {last && (
-          <button className="secondary" onClick={() => onResume(last)} title={typeof last === 'string' ? last : undefined}>
-            {T.start.resume(lastName ?? '')}
-          </button>
-        )}
         <p className="muted small">{T.start.subfolders}</p>
       </div>
 
