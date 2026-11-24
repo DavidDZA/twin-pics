@@ -60,10 +60,17 @@
 >
 > (24/11) **Version 0.11** : date lue dans le **nom du fichier** quand la photo n'a pas de date EXIF (ARCHITECTURE § 3).
 >
-> **Reprendre ici** : essai en cours par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
-> dossiers, l'avertissement pour une sauvegarde. Ensuite, proposé : un vrai ménage de ses photos (seule l'utilisation
-> montrera les manques), puis l'**appli Android** (§ 5.3, **rien commencer sans son feu vert**). Petits plus possibles
-> avant, sur PC : astuces de première visite et annonce des nouvelles versions (§ 3), vidéos en double (§ 6).
+> **Reprendre ici** (projet en pause depuis le 24/11/2026, à la demande de l'utilisateur ; rien en cours, la 0.11 est publiée) :
+>
+> 1. **Par l'utilisateur** : un vrai ménage de ses photos avec la 0.11 (seule l'utilisation montrera les manques). À
+>    regarder : le clic de plus (« Analyser »), l'ordre des dossiers (poignée ⠿), l'avertissement pour une sauvegarde, les
+>    groupes mis de côté tout seuls, les rafales, les dates lues dans les noms.
+> 2. **Version 0.12 proposée** (pas encore décidée) : **annonce des nouvelles versions** et **astuces de première visite**
+>    (§ 3), les deux manques les plus gênants pour une appli publique.
+> 3. **Autres petits plus sur PC**, au choix : dossier « sauvegarde » comparé mais jamais supprimé (§ 3), vidéos en double
+>    (§ 6.1 ; plus long), HEIC s'il en a (§ 3), « ces deux photos sont des doublons » avec un export pour régler les seuils (§ 2).
+> 4. **Appli Android** (§ 5, point 3) : **rien commencer sans son feu vert**. À vérifier en premier : WebGPU dans la WebView,
+>    mémoire avec 10 000 photos, vitesse sur téléphone.
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -92,7 +99,9 @@
 - **Plus d'installateur** : seulement l'exe portable.
 - Android : ne rien commencer pour l'instant.
 
-## 2. Mesurer la détection sur les vraies photos (prochaine étape)
+## 2. Mesurer la détection sur les vraies photos
+
+> Détection validée par l'utilisateur le 21/11 (« a super bien marché ») ; ceci reste utile pour affiner les seuils.
 
 1. Lancer l'analyse sur un vrai dossier ; noter le nombre de photos et la durée de chaque étape (analyse, modèle).
 2. Parcourir les groupes, marquer « Pas des doublons » les erreurs, jouer avec les curseurs.
