@@ -1,6 +1,6 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.8 : **doublons et photos inutiles
+> **À lire en premier par toute nouvelle session de travail.** État au 23/11/2026 (version 0.9 : **doublons et photos inutiles
 > séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
 > de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
@@ -42,7 +42,7 @@ Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
   **Rien n'est partagé entre les deux** : choix (`marks`, `junkMarks`), groupes mis de côté, suppression. Une photo
   inutile qui a aussi un double apparaît dans les deux ; supprimée d'un côté, elle disparaît de l'autre.
 - Par-dessus : l'**écran de tri** (`Sorter`, plein écran), la **visionneuse** (`Viewer`, § 4.5), les fenêtres **« Avant de
-  supprimer »** (`RemoveDialog`), « Effacer tous mes choix » (`ResetDialog`), « Stats et badges » (`StatsDialog`), et les petits
+  supprimer »** (`RemoveDialog`), « Effacer mes choix » (`ResetDialog`, une fonction ou les deux), « Stats et badges » (`StatsDialog`), et les petits
   messages (`Toasts`, `notify.ts` : badge gagné, groupe mis de côté avec « Annuler »).
 
 ### 1.1 Plusieurs dossiers à la fois (0.8, 24/11/2026 ; `folders.ts`)
@@ -416,9 +416,17 @@ place des duels.
   liste ». Jusqu'à la 0.4, ces boutons (et « Bien trouvé », retiré) ne servaient qu'à noter la détection.
 - Doublons : un groupe est caché si toutes ses photos étaient dans un même groupe mis de côté (il reste caché s'il
   rétrécit, il revient s'il gagne une photo : c'est peut-être un vrai double). Photos inutiles : photo par photo.
-- **« Effacer tous mes choix… »** (barre du haut ; les deux fonctions ensemble, un bouton par fonction jusqu'à la 0.6) : après
-  confirmation, les photos triées **du dossier analysé** redeviennent à trier et ses groupes mis de côté reviennent.
-  Aucun fichier touché ; les stats restent.
+- **Mis de côté tout seul par le tri** (0.9, demandé le 24/11/2026 : ne plus repasser par la liste pour « Pas des
+  doublons ») : déduit des choix eux-mêmes (`keptTogether`, `keptKeys`), rien de plus en base, donc un choix changé se
+  répercute aussitôt et les tris d'avant la 0.9 comptent. Doublons : un groupe dont toutes les photos sont gardées, dans le
+  même tri (`groupId`). S'il y a aussi des photos à supprimer, il reste « Trié » dans la liste jusqu'à leur suppression,
+  puis ce qui reste est mis de côté. Photos inutiles : chaque photo gardée, tout de suite. La grille le dit (« Les photos
+  gardées seront mises de côté »). « Remettre dans la liste » efface le choix de ces photos. Les deux boutons restent.
+- **Photos à supprimer** : cadre rouge et étiquette, jamais de voile ni de gris (retirés en 0.9 : on ne les voyait plus,
+  il fallait cliquer sur chacune), dans la grille, la liste et le récapitulatif.
+- **Effacer les choix** : « Effacer tous mes choix… » (barre du haut, les deux fonctions) et, sur chaque page, **« Effacer mes
+  choix des doublons… » / « … des photos inutiles… »** (0.9, celle-ci seulement). Après confirmation, les photos triées **des
+  dossiers analysés** redeviennent à trier et leurs groupes mis de côté reviennent. Aucun fichier touché ; les stats restent.
 
 ### 4.5 Zoom (`zoom.ts`, `Viewer`, 23/11/2026)
 
@@ -468,6 +476,8 @@ durées par `Intl` (`bytes`, `duration`).
   limite de temps, raisons différentes jamais ensemble, photos à laisser de côté, photo décidée seule, garde-fou contre les chaînes,
   regroupement par dHash sans le modèle, tout à jeter par défaut. Images uniformes jamais « similaires »
   (`groups.test.ts`).
+- **Mis de côté** (`ignored.test.ts`) : par un bouton, ou par le tri (tout gardé, gardé en partie, nouvelle photo, tris
+  différents).
 - **Tri** (`choices.test.ts`) : suggestion seule par défaut, en garder plusieurs ou aucune, groupe trié ou non, choix
   repris, photos à supprimer et place libérée, « tout supprimer » signalé, photo marquée hors groupe jamais supprimée,
   duels (la gagnante affronte la suivante, groupe de deux photos).
@@ -493,7 +503,7 @@ sans elles (photos déjà vues complétées).
 - **Playwright, tri sur le site** (`e2e/tri.spec.ts`, téléphone et PC) : groupe de deux photos directement au résumé
   (en garder deux), deux duels dans un groupe de trois (« VS », la copie gagne), « Plein écran » pendant un duel, fin du tri, fenêtre « Avant de supprimer » sans bouton de suppression mais avec le
   lien vers l'appli PC ; grille (« Tout garder », « Passer », « Revoir les groupes passés », choix changé dans la
-  visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; effacer tous mes choix (les deux fonctions) ; toutes les copies exactes ; téléphone : duel l'une sous l'autre en
+  visionneuse, « Trier ce groupe ») ; tri retenu après une nouvelle analyse ; effacer tous mes choix (les deux fonctions) ou ceux d'une page ; tout garder met de côté tout seul (retour en arrière, retenu, remis) ; toutes les copies exactes ; téléphone : duel l'une sous l'autre en
   portrait, côte à côte en paysage (760 × 393), résumé sans défilement horizontal. Captures dans `test-results/`.
 - **Playwright, photos inutiles** (`e2e/inutiles.spec.ts`, dossier d'essai `Ratées` : deux photos noires, une floue,
   une sombre, deux captures, une page de texte) : page (6 groupes, 7 photos, les noires regroupées, raisons), réglages

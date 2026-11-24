@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { T } from '../i18n';
 
 interface Props {
+  /** Les choix d'une fonction, ou des deux. */
+  title: string;
   /** Photos triées et groupes mis de côté qui redeviendront à trier. */
   sorted: number;
   ignored: number;
@@ -11,7 +13,7 @@ interface Props {
 }
 
 /** « Effacer mes choix » : confirmation (aucun fichier n'est touché). */
-export function ResetDialog({ sorted, ignored, onCancel, onConfirm }: Props) {
+export function ResetDialog({ title, sorted, ignored, onCancel, onConfirm }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
     window.addEventListener('keydown', onKey);
@@ -21,7 +23,7 @@ export function ResetDialog({ sorted, ignored, onCancel, onConfirm }: Props) {
   return createPortal(
     <div className="modal-back" onClick={(e) => e.target === e.currentTarget && onCancel()}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="reset-title">
-        <h2 id="reset-title">{T.reset.title}</h2>
+        <h2 id="reset-title">{title}</h2>
         <p>
           {sorted > 0 && <>{T.reset.sorted(sorted)} </>}
           {ignored > 0 && <>{T.reset.ignored(ignored)} </>}

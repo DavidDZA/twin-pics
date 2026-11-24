@@ -97,7 +97,9 @@ test('swipe : une photo à la fois (bouton, clavier, geste), sans résumé à la
 
   // Fermer en cours de route : les photos jetées comptent déjà, sans finir leur groupe.
   await s.getByRole('button', { name: 'Retour aux groupes' }).click();
-  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 4 photos sur 7');
+  // La photo gardée est mise de côté tout de suite.
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 3 photos sur 6');
+  await expect(page.getByText('Groupes mis de côté (1)')).toBeVisible();
   await page.getByRole('button', { name: /Supprimer 3 photos/ }).click();
   const modal = page.getByRole('dialog', { name: 'Avant de supprimer' });
   await expect(modal.getByTestId('remove-summary')).toContainText('3 photos à supprimer');
@@ -106,13 +108,13 @@ test('swipe : une photo à la fois (bouton, clavier, geste), sans résumé à la
 
   // Reprise où on en était ; après la dernière photo, retour direct à la liste.
   await page.getByRole('button', { name: 'Continuer le tri' }).click();
-  await expect(s.getByText('Photo 5 sur 7')).toBeVisible();
-  for (let n = 5; n <= 7; n++) {
-    await expect(s.getByText(`Photo ${n} sur 7`)).toBeVisible();
+  for (let n = 4; n <= 6; n++) {
+    await expect(s.getByText(`Photo ${n} sur 6`)).toBeVisible();
     await page.keyboard.press('ArrowRight');
   }
   await expect(s).toBeHidden();
-  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 7 photos sur 7');
+  await expect(page.getByTestId('sort-progress')).toHaveText('Triées : 3 photos sur 3');
+  await expect(page.getByTestId('ignored').getByText('floue.jpg')).toHaveCount(1);
   // Les doublons n'ont pas bougé : chaque fonction a ses choix.
   await page.locator('.fn-switch').getByRole('button', { name: /Doublons/ }).click();
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 0 groupe sur 2');
@@ -120,9 +122,9 @@ test('swipe : une photo à la fois (bouton, clavier, geste), sans résumé à la
   // « Revoir le tri » : toutes les photos défilent de nouveau.
   await page.locator('.fn-switch').getByRole('button', { name: /Photos inutiles/ }).click();
   await page.getByRole('button', { name: 'Revoir le tri' }).click();
-  await expect(s.getByText('Photo 1 sur 7')).toBeVisible();
+  await expect(s.getByText('Photo 1 sur 3')).toBeVisible();
   await page.keyboard.press('ArrowRight');
-  await expect(s.getByText('Photo 2 sur 7')).toBeVisible();
+  await expect(s.getByText('Photo 2 sur 3')).toBeVisible();
 });
 
 test('« Pas inutiles » : ces photos ne sont plus proposées ; se remettent', async ({ page }) => {

@@ -61,6 +61,7 @@ export const es: Dict = {
     },
     none: 'No se han encontrado duplicados con estos ajustes.',
     noneJunk: 'No se ha encontrado ninguna foto inútil con estos ajustes.',
+    noneLeft: 'No queda ningún grupo por ordenar: están todos apartados.',
     more: 'Ver más',
     skipped: (unreadable, unsupported, videos) =>
       'Sin analizar: ' +
@@ -136,6 +137,7 @@ export const es: Dict = {
     validate: 'Confirmar',
     counts: (keep, remove) => `${keep} conservada${s(keep)}, ${remove} para borrar`,
     noneKept: 'Ninguna foto conservada: se borrará todo el grupo.',
+    aside: 'Las fotos conservadas se apartarán.',
     duelHelp: 'Toca la que prefieras.',
     duelOf: (i, n) => `Duelo ${i} de ${n}`,
     redoDuels: 'Repetir los duelos',
@@ -231,13 +233,17 @@ export const es: Dict = {
   ignored: {
     done: 'Grupo apartado.',
     title: (n) => `Grupos apartados (${n})`,
-    help: 'Los grupos «No son duplicados» ya no se proponen.',
-    helpJunk: 'Las fotos «No son inútiles» ya no se proponen.',
+    help: 'Los grupos «No son duplicados», y aquellos de los que conservaste todas las fotos, ya no se proponen.',
+    helpJunk: 'Las fotos «No son inútiles», y las que conservaste, ya no se proponen.',
     restore: 'Devolver a la lista',
   },
   reset: {
     button: 'Borrar todas mis elecciones…',
-    title: 'Borrar mis elecciones',
+    buttonDup: 'Borrar mis elecciones de duplicados…',
+    buttonJunk: 'Borrar mis elecciones de fotos inútiles…',
+    title: 'Borrar todas mis elecciones',
+    titleDup: 'Borrar mis elecciones de duplicados',
+    titleJunk: 'Borrar mis elecciones de fotos inútiles',
     sorted: (n) => (n === 1 ? `${n} foto vuelve a estar por ordenar.` : `${n} fotos vuelven a estar por ordenar.`),
     ignored: (n) => (n === 1 ? `${n} grupo apartado vuelve a la lista.` : `${n} grupos apartados vuelven a la lista.`),
     safe: 'No se borra ni se mueve ninguna foto.',

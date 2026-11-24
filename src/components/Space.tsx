@@ -30,11 +30,13 @@ interface Props {
   onSave: (group: Group, choice: Choice) => void;
   onIgnore: (group: Group) => void;
   onRestore: (group: Group) => void;
+  /** « Effacer mes choix des doublons… » : absent s'il n'y en a pas. */
+  onReset?: () => void;
   /** Ouvre « Avant de supprimer » ; `exact` : toutes les copies exactes, sans les trier. */
   onRemove: (exact?: Pending) => void;
 }
 
-export function Space({ fn, groups, ignored, photos, files, marks, pending, settings, report, onSave, onIgnore, onRestore, onRemove }: Props) {
+export function Space({ fn, groups, ignored, photos, files, marks, pending, settings, report, onSave, onIgnore, onRestore, onReset, onRemove }: Props) {
   const [tab, setTab] = useState<DupKind | 'all'>('all');
   const [shown, setShown] = useState(PAGE);
   const [viewing, setViewing] = useState<{ group: Group; index: number } | null>(null);
@@ -93,11 +95,18 @@ export function Space({ fn, groups, ignored, photos, files, marks, pending, sett
         </div>
       )}
 
-      {exact && exact.remove.length > 0 && (
+      {(onReset || (exact && exact.remove.length > 0)) && (
         <div className="actions-row">
-          <button className="secondary" onClick={() => onRemove(exact)}>
-            {T.exact.button(exact.remove.length, bytes(exact.bytes))}
-          </button>
+          {exact && exact.remove.length > 0 && (
+            <button className="secondary" onClick={() => onRemove(exact)}>
+              {T.exact.button(exact.remove.length, bytes(exact.bytes))}
+            </button>
+          )}
+          {onReset && (
+            <button className="secondary" onClick={onReset}>
+              {isJunk ? T.reset.buttonJunk : T.reset.buttonDup}
+            </button>
+          )}
         </div>
       )}
 
@@ -118,7 +127,7 @@ export function Space({ fn, groups, ignored, photos, files, marks, pending, sett
       {(isJunk || tab !== 'all') && <p className="muted small">{T.results.kindHelp[isJunk ? 'junk' : (tab as DupKind)]}</p>}
 
       {visible.length === 0 ? (
-        <p className="empty">{isJunk ? T.results.noneJunk : T.results.none}</p>
+        <p className="empty">{ignored.length > 0 ? T.results.noneLeft : isJunk ? T.results.noneJunk : T.results.none}</p>
       ) : (
         <div className="groups">
           {visible.slice(0, shown).map((g, i) => (

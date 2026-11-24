@@ -48,9 +48,6 @@
   margin-bottom: 24px;
 }
 
-.ignored .group {
-  opacity: 0.85;
-}
 
 /* Messages en haut de l'écran */
 .toasts {

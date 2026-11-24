@@ -61,6 +61,7 @@ export const fr = {
     },
     none: 'Aucun doublon trouvé avec ces réglages.',
     noneJunk: 'Aucune photo inutile trouvée avec ces réglages.',
+    noneLeft: 'Plus aucun groupe à trier : ils sont tous mis de côté.',
     more: 'Voir plus',
     skipped: (unreadable: number, unsupported: number, videos: number) =>
       'Non analysés : ' +
@@ -137,6 +138,7 @@ export const fr = {
     validate: 'Valider',
     counts: (keep: number, remove: number) => `${keep} gardée${s(keep)}, ${remove} à supprimer`,
     noneKept: 'Aucune photo gardée : tout le groupe sera supprimé.',
+    aside: 'Les photos gardées seront mises de côté.',
     duelHelp: 'Touche celle que tu préfères.',
     duelOf: (i: number, n: number) => `Duel ${i} sur ${n}`,
     redoDuels: 'Refaire les duels',
@@ -232,13 +234,17 @@ export const fr = {
   ignored: {
     done: 'Groupe mis de côté.',
     title: (n: number) => `Groupes mis de côté (${n})`,
-    help: 'Les groupes « Pas des doublons » ne sont plus proposés.',
-    helpJunk: 'Les photos « Pas inutiles » ne sont plus proposées.',
+    help: 'Les groupes « Pas des doublons », et ceux dont tu as gardé toutes les photos, ne sont plus proposés.',
+    helpJunk: 'Les photos « Pas inutiles », et celles que tu as gardées, ne sont plus proposées.',
     restore: 'Remettre dans la liste',
   },
   reset: {
     button: 'Effacer tous mes choix…',
-    title: 'Effacer mes choix',
+    buttonDup: 'Effacer mes choix des doublons…',
+    buttonJunk: 'Effacer mes choix des photos inutiles…',
+    title: 'Effacer tous mes choix',
+    titleDup: 'Effacer mes choix des doublons',
+    titleJunk: 'Effacer mes choix des photos inutiles',
     sorted: (n: number) => (n > 1 ? `${n} photos redeviennent à trier.` : `${n} photo redevient à trier.`),
     ignored: (n: number) => (n > 1 ? `${n} groupes mis de côté reviennent dans la liste.` : `${n} groupe mis de côté revient dans la liste.`),
     safe: 'Aucune photo n’est supprimée ni déplacée.',

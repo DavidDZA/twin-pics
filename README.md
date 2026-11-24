@@ -4,7 +4,7 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.8, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
+**État : appli PC** (version 0.9, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
 **photos inutiles** (floues, ratées, captures d'écran, documents…) d'un ou plusieurs dossiers. Elle les fait trier (garder une photo,
 plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le site web reste là pour essayer (il
 trouve et trie, il ne supprime pas). L'appli Android viendra ensuite. Pas de version Mac ni iPhone.
@@ -28,7 +28,7 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin.Pics.0.8.1.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.9.0.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest). Rien à installer : la première ouverture se
    décompresse (une barre, 10 à 35 s), les suivantes sont immédiates (l'appli reste dans
    `%LOCALAPPDATA%\Twin Pics Portable`). Windows peut afficher « Windows a protégé votre ordinateur » (appli non
@@ -57,8 +57,10 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
    Chaque photo a un bouton **« Plein écran »** ; en plein écran, les flèches à gauche et à droite (ou le clavier, ou
    glisser le doigt) passent aux autres photos du groupe. **Zoom** : molette, double clic, touches + − 0, ou deux
    doigts ; il est gardé en passant d'une photo à l'autre, pour comparer un détail.
-   Le tri est retenu, même si on ferme l'appli. « Effacer tous mes choix… » remet
-   tout à trier (aucune photo n'est touchée).
+   Le tri est retenu, même si on ferme l'appli. Les photos gardées ensemble (deux ou plus ; une seule
+   pour les photos inutiles) sont **mises de côté toutes seules** et ne sont plus proposées. « Effacer mes choix des
+   doublons… » (ou « des photos inutiles… ») remet une page à trier, « Effacer tous mes choix… » les deux ; aucune photo
+   n'est touchée.
 5. **Supprimer n photos** : une fenêtre récapitule, groupe par groupe, ce qui est gardé et supprimé (et prévient si un
    groupe n'en garde aucune). Les photos vont, au choix, dans la **Corbeille de Windows** ou dans un **dossier « À
    supprimer »** (un dans chaque dossier analysé, ou un seul au choix ; rangées avec leurs sous-dossiers, annulable juste après). Sur un disque sans Corbeille (clé USB),

@@ -60,6 +60,7 @@ export const en: Dict = {
     },
     none: 'No duplicates found with these settings.',
     noneJunk: 'No useless photo found with these settings.',
+    noneLeft: 'No group left to sort: they are all set aside.',
     more: 'Show more',
     skipped: (unreadable, unsupported, videos) =>
       'Not analyzed: ' +
@@ -134,6 +135,7 @@ export const en: Dict = {
     validate: 'Confirm',
     counts: (keep, remove) => `${keep} kept, ${remove} to delete`,
     noneKept: 'No photo kept: the whole group will be deleted.',
+    aside: 'The photos you keep will be set aside.',
     duelHelp: 'Tap the one you prefer.',
     duelOf: (i, n) => `Duel ${i} of ${n}`,
     redoDuels: 'Redo the duels',
@@ -228,13 +230,17 @@ export const en: Dict = {
   ignored: {
     done: 'Group set aside.',
     title: (n) => `Groups set aside (${n})`,
-    help: '“Not duplicates” groups are no longer suggested.',
-    helpJunk: '“Not useless” photos are no longer suggested.',
+    help: '“Not duplicates” groups, and those where you kept every photo, are no longer suggested.',
+    helpJunk: '“Not useless” photos, and the ones you kept, are no longer suggested.',
     restore: 'Put back in the list',
   },
   reset: {
     button: 'Clear all my choices…',
-    title: 'Clear my choices',
+    buttonDup: 'Clear my duplicate choices…',
+    buttonJunk: 'Clear my useless photo choices…',
+    title: 'Clear all my choices',
+    titleDup: 'Clear my duplicate choices',
+    titleJunk: 'Clear my useless photo choices',
     sorted: (n) => `${n} photo${s(n)} will need sorting again.`,
     ignored: (n) => `${n} group${s(n)} set aside will be back in the list.`,
     safe: 'No photo is deleted or moved.',

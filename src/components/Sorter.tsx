@@ -6,7 +6,8 @@
  * - **Duels** (téléphone) : deux photos à la fois, on touche celle qu'on préfère ; la gagnante affronte la suivante.
  *   À la fin, le résumé du groupe (la grille) permet d'en garder plusieurs, ou aucune, avant de valider. Un groupe de
  *   deux photos va directement au résumé (un duel n'apporterait rien de plus).
- * « Pas des doublons » / « Pas inutiles » met le groupe de côté (`ignored.ts`) et passe au suivant.
+ * « Pas des doublons » / « Pas inutiles » met le groupe de côté (`ignored.ts`) et passe au suivant ; « Valider » le fait
+ * tout seul quand il reste des photos gardées ensemble (deux ou plus ; une seule pour les photos inutiles).
  * Chaque photo a un bouton « Plein écran » (la visionneuse, flèches pour passer aux autres photos du groupe).
  * Rien n'est supprimé ici : les choix sont retenus, la suppression se fait à la fin (`RemoveDialog`).
  */
@@ -382,6 +383,7 @@ function GroupSorter({ group, photos, files, marks, view, hasPrev, onPrev, onSki
           {T.sort.noneKept}
         </p>
       )}
+      {keep >= (group.junk ? 1 : 2) && <p className="muted small aside">{T.sort.aside}</p>}
       <div className="sorter-actions">
         <div className="quick">
           {!group.junk && (

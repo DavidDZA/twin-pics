@@ -211,8 +211,9 @@ test('appli PC : photos inutiles triées en swipe, puis à la Corbeille', async 
   await expect(page.getByTestId('remove-report')).toContainText('3 photos supprimées');
   expect(readdirSync(trash).sort()).toEqual(['noire-1.jpg', 'noire-2.jpg', 'sombre.jpg']);
   expect(existsSync(join(photos, 'Ratées', 'floue.jpg'))).toBe(true);
-  // Restent : la floue (gardée), la rafale floue et les deux captures d'écran.
-  await expect(page.getByTestId('group')).toHaveCount(4);
+  // Restent : la rafale floue et les deux captures d'écran ; la floue, gardée, est mise de côté.
+  await expect(page.getByTestId('space-junk').locator(':scope > .groups > [data-testid=group]')).toHaveCount(3);
+  await expect(page.getByText('Groupes mis de côté (1)')).toBeVisible();
 });
 
 test('appli PC : photos similaires sur la carte graphique (E2E_MODELE=1 : télécharge le modèle)', async () => {
@@ -258,7 +259,12 @@ test('appli PC : garder plusieurs photos, tout supprimer, tri retenu au lancemen
   await page.getByRole('button', { name: 'Analyser' }).click();
   await expect(page.getByText('rien de nouveau')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('sort-progress')).toHaveText('Triés : 2 groupes sur 2');
-  await expect(page.getByRole('button', { name: /Supprimer 3 photos/ })).toBeVisible();
+  // Après la suppression, les deux photos gardées ensemble ne sont plus proposées : groupe mis de côté tout seul.
+  await page.getByRole('button', { name: /Supprimer 3 photos/ }).click();
+  await page.getByRole('dialog', { name: 'Avant de supprimer' }).getByRole('button', { name: 'Supprimer 3 photos' }).click();
+  await expect(page.getByTestId('remove-report')).toContainText('3 photos supprimées');
+  await expect(page.getByText('Plus aucun groupe à trier : ils sont tous mis de côté.')).toBeVisible();
+  await expect(page.getByText('Groupes mis de côté (1)')).toBeVisible();
 });
 
 test('appli PC : plusieurs dossiers, « À supprimer » dans chacun, annulation, liste retenue, clé débranchée', async () => {

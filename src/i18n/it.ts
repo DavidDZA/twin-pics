@@ -61,6 +61,7 @@ export const it: Dict = {
     },
     none: 'Nessun doppione trovato con queste impostazioni.',
     noneJunk: 'Nessuna foto inutile trovata con queste impostazioni.',
+    noneLeft: 'Nessun gruppo da smistare: sono tutti messi da parte.',
     more: 'Mostra altri',
     skipped: (unreadable, unsupported, videos) =>
       'Non analizzati: ' +
@@ -135,6 +136,7 @@ export const it: Dict = {
     validate: 'Conferma',
     counts: (keep, remove) => `${keep} ${pl(keep, 'tenuta', 'tenute')}, ${remove} da eliminare`,
     noneKept: 'Nessuna foto tenuta: tutto il gruppo verrà eliminato.',
+    aside: 'Le foto tenute verranno messe da parte.',
     duelHelp: 'Tocca quella che preferisci.',
     duelOf: (i, n) => `Duello ${i} di ${n}`,
     redoDuels: 'Rifai i duelli',
@@ -230,13 +232,17 @@ export const it: Dict = {
   ignored: {
     done: 'Gruppo messo da parte.',
     title: (n) => `Gruppi messi da parte (${n})`,
-    help: 'I gruppi «Non sono doppioni» non vengono più proposti.',
-    helpJunk: 'Le foto «Non sono inutili» non vengono più proposte.',
+    help: 'I gruppi «Non sono doppioni», e quelli di cui hai tenuto tutte le foto, non vengono più proposti.',
+    helpJunk: 'Le foto «Non sono inutili», e quelle che hai tenuto, non vengono più proposte.',
     restore: 'Rimetti nell’elenco',
   },
   reset: {
     button: 'Cancella tutte le mie scelte…',
-    title: 'Cancella le mie scelte',
+    buttonDup: 'Cancella le mie scelte sui doppioni…',
+    buttonJunk: 'Cancella le mie scelte sulle foto inutili…',
+    title: 'Cancella tutte le mie scelte',
+    titleDup: 'Cancella le mie scelte sui doppioni',
+    titleJunk: 'Cancella le mie scelte sulle foto inutili',
     sorted: (n) => pl(n, `${n} foto torna da smistare.`, `${n} foto tornano da smistare.`),
     ignored: (n) => pl(n, `${n} gruppo messo da parte torna nell’elenco.`, `${n} gruppi messi da parte tornano nell’elenco.`),
     safe: 'Nessuna foto viene eliminata o spostata.',

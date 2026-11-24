@@ -58,7 +58,8 @@ button.danger {
 }
 
 .photos li.remove .thumb {
-  opacity: 0.45;
+  outline: 2px dashed var(--wrong);
+  outline-offset: -2px;
 }
 
 .mark {
@@ -189,10 +190,7 @@ body:has(.sorter, .modal-back, .viewer) {
   border-style: dashed;
 }
 
-.grid-photos li.remove .pick img {
-  opacity: 0.4;
-}
-
+/* Jamais de filtre sur une photo à supprimer : il faut la voir pour décider (cadre rouge et étiquette suffisent). */
 .pick .state {
   position: absolute;
   top: 6px;
@@ -390,10 +388,6 @@ body:has(.sorter, .modal-back, .viewer) {
   display: block;
 }
 
-.plan-photos li.remove img {
-  opacity: 0.45;
-}
-
 .plan-photos .state {
   position: absolute;
   left: 0;
@@ -572,4 +566,8 @@ body:has(.sorter, .modal-back, .viewer) {
   .sorter-actions button {
     padding: 4px 10px;
   }
+}
+
+.sorter-body .aside {
+  margin: 6px 0 0;
 }

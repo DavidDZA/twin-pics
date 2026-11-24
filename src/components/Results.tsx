@@ -12,7 +12,7 @@ import { T, bytes, duration, num } from '../i18n';
 import { buildGroups, DEFAULTS, usedRanks, type Group, type Params } from '../lib/groups';
 import { db, type LabelRow, type MarkRow } from '../lib/db';
 import { isSorted, pendingRemoval, type Choice, type Mark, type Pending } from '../lib/choices';
-import { coveringLabels, ignoredKeys, splitIgnored, wrongLabels } from '../lib/ignored';
+import { coveringLabels, ignoredKeys, keptKeys, splitIgnored, wrongLabels } from '../lib/ignored';
 import { notify } from '../lib/notify';
 import { sortedStats } from '../lib/stats';
 import { addStats } from '../lib/statsStore';
@@ -37,7 +37,8 @@ const REMOVE_BATCH = 20;
 
 const table = (fn: Fn) => (fn === 'dup' ? db.marks : db.junkMarks);
 const FNS: Fn[] = ['dup', 'junk'];
-type Marks = Record<Fn, Map<string, Mark>>;
+type Rows = Record<Fn, Map<string, MarkRow>>;
+const justMarks = (rows: Map<string, MarkRow>) => new Map<string, Mark>([...rows].map(([k, r]) => [k, r.mark]));
 
 function readSpace(): Fn {
   try {
@@ -110,10 +111,12 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const [junkParams, setJunkParamsState] = useState<JunkParams>(readJunkParams);
   const [space, setSpace] = useState<Fn>(readSpace);
   const [labels, setLabels] = useState<Map<string, LabelRow>>(new Map());
-  const [marks, setMarks] = useState<Marks>({ dup: new Map(), junk: new Map() });
+  const [rows, setRows] = useState<Rows>({ dup: new Map(), junk: new Map() });
+  const marks = useMemo<Record<Fn, Map<string, Mark>>>(() => ({ dup: justMarks(rows.dup), junk: justMarks(rows.junk) }), [rows]);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [removing, setRemoving] = useState<{ fn: Fn; exact: Pending | null } | null>(null);
-  const [resetting, setResetting] = useState(false);
+  /** Fonctions dont on s'apprête à effacer les choix. */
+  const [resetting, setResetting] = useState<Fn[]>([]);
   const [working, setWorking] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [removeSettings, setRemoveSettingsState] = useState<RemoveSettings>(readRemoveSettings);
@@ -151,21 +154,21 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   };
 
   useEffect(() => {
-    const load = (rows: MarkRow[]) => new Map(rows.map((r) => [r.key, r.mark]));
+    const load = (list: MarkRow[]) => new Map(list.map((r) => [r.key, r]));
     db.labels.toArray().then((rows) => setLabels(new Map(rows.map((r) => [r.groupId, r]))));
-    Promise.all([db.marks.toArray(), db.junkMarks.toArray()]).then(([dup, junk]) => setMarks({ dup: load(dup), junk: load(junk) }));
+    Promise.all([db.marks.toArray(), db.junkMarks.toArray()]).then(([dup, junk]) => setRows({ dup: load(dup), junk: load(junk) }));
   }, []);
 
   // Doublons.
   const pairs = useMemo(() => (gone.size ? result.pairs.filter((p) => !gone.has(photos[p.a].key) && !gone.has(photos[p.b].key)) : result.pairs), [result, photos, gone]);
   const built = useMemo(() => buildGroups(photos, pairs, params), [photos, pairs, params]);
-  const dup = useMemo(() => splitIgnored(built, photos, wrongLabels(labels.values(), false)), [built, photos, labels]);
+  const dup = useMemo(() => splitIgnored(built, photos, wrongLabels(labels.values(), false), rows.dup), [built, photos, labels, rows.dup]);
 
   // Photos inutiles : probabilités du modèle (une fois), raisons et groupes (à chaque réglage).
   const scores = useMemo(() => photos.map((p) => (p.clip ? clipScores(p.clip, PROMPTS) : undefined)), [photos]);
   const reasons = useMemo(() => photos.map((p, i) => junkReasons({ ...p, scores: scores[i] }, junkParams)), [photos, scores, junkParams]);
   const junk = useMemo(() => {
-    const aside = ignoredKeys(wrongLabels(labels.values(), true));
+    const aside = new Set([...ignoredKeys(wrongLabels(labels.values(), true)), ...keptKeys(rows.junk)]);
     const hidden = new Set<number>();
     const kept = new Set<number>();
     photos.forEach((p, i) => {
@@ -176,7 +179,7 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
       shown: buildJunkGroups(photos, reasons, junkParams, hidden),
       ignored: aside.size ? buildJunkGroups(photos, reasons, junkParams, kept) : [],
     };
-  }, [photos, reasons, junkParams, labels, gone]);
+  }, [photos, reasons, junkParams, labels, rows.junk, gone]);
   const hasModel = useMemo(() => photos.some((p) => p.clip), [photos]);
 
   const groups: Record<Fn, { shown: Group[]; ignored: Group[] }> = { dup, junk };
@@ -189,29 +192,24 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const choicesOf = (fn: Fn) => {
     const keys = photos.filter((p) => marks[fn].has(p.key)).map((p) => p.key);
     const here = new Set(photos.map((p) => p.key));
-    const rows = wrongLabels(labels.values(), fn === 'junk').filter((l) => l.keys.some((k) => here.has(k)));
-    return { keys, rows };
+    const aside = wrongLabels(labels.values(), fn === 'junk').filter((l) => l.keys.some((k) => here.has(k)));
+    return { keys, aside };
   };
   const hasChoices = (fn: Fn) => {
     const c = choicesOf(fn);
-    return c.keys.length + c.rows.length > 0;
+    return c.keys.length + c.aside.length > 0;
   };
   const reset = () => {
-    for (const fn of FNS) {
-      const { keys, rows } = choicesOf(fn);
+    for (const fn of resetting) {
+      const { keys, aside } = choicesOf(fn);
       dropMarks(fn, keys);
-      void db.labels.bulkDelete(rows.map((r) => r.groupId));
-      setLabels((m) => {
-        const n = new Map(m);
-        for (const r of rows) n.delete(r.groupId);
-        return n;
-      });
+      void restore(aside);
     }
-    setResetting(false);
+    setResetting([]);
   };
 
   const dropMarks = (fn: Fn, keys: string[]) => {
-    setMarks((m) => {
+    setRows((m) => {
       const n = new Map(m[fn]);
       for (const k of keys) n.delete(k);
       return { ...m, [fn]: n };
@@ -237,6 +235,8 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const restoreGroup = (fn: Fn, group: Group) => {
     const all = wrongLabels(labels.values(), fn === 'junk');
     const keys = new Set(group.members.map((i) => photos[i].key));
+    // Mis de côté par le tri : ses photos gardées redeviennent à trier.
+    dropMarks(fn, [...keys].filter((k) => marks[fn].get(k) === 'keep'));
     void restore(fn === 'junk' ? all.filter((l) => l.keys.some((k) => keys.has(k))) : coveringLabels(group, photos, all));
   };
 
@@ -244,28 +244,28 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const saveChoice = useCallback(
     (fn: Fn, group: Group, choice: Choice) => {
       const at = Date.now();
-      const rows: MarkRow[] = Object.entries(choice).map(([key, mark]) => ({ key, mark, groupId: group.id, at }));
+      const saved: MarkRow[] = Object.entries(choice).map(([key, mark]) => ({ key, mark, groupId: group.id, at }));
       const before = marks[fn];
-      const fresh = rows.filter((r) => !before.has(r.key));
+      const fresh = saved.filter((r) => !before.has(r.key));
       if (fresh.length) {
         const times = new Map(group.members.map((i) => [photos[i].key, photos[i].time]));
         const { plus, record } = sortedStats(fresh.map((r) => ({ mark: r.mark, time: times.get(r.key) })));
         if (fn === 'dup' && !isSorted(group, photos, before)) {
-          const kept = rows.filter((r) => r.mark === 'keep').length;
-          Object.assign(plus, { groups: 1, keptAll: kept === rows.length ? 1 : 0, noneKept: kept ? 0 : 1 });
-          record.biggestGroup = rows.length;
+          const kept = saved.filter((r) => r.mark === 'keep').length;
+          Object.assign(plus, { groups: 1, keptAll: kept === saved.length ? 1 : 0, noneKept: kept ? 0 : 1 });
+          record.biggestGroup = saved.length;
         }
         // Dernière photo de la liste : tout est trié.
-        const after = new Map([...before, ...rows.map((r) => [r.key, r.mark] as const)]);
+        const after = new Map([...before, ...saved.map((r) => [r.key, r.mark] as const)]);
         if (shown[fn].every((g) => isSorted(g, photos, after)) && !shown[fn].every((g) => isSorted(g, photos, before))) plus.perfect = 1;
         addStats(plus, record);
       }
-      setMarks((m) => {
+      setRows((m) => {
         const n = new Map(m[fn]);
-        for (const r of rows) n.set(r.key, r.mark);
+        for (const r of saved) n.set(r.key, r);
         return { ...m, [fn]: n };
       });
-      void table(fn).bulkPut(rows);
+      void table(fn).bulkPut(saved);
     },
     [marks, photos, shown],
   );
@@ -337,7 +337,7 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
   const skipped = result.unreadable + result.unsupported + result.videos;
 
   const reportBox = report && <RemoveReport report={report} onUndo={undo} onClose={() => setReport(null)} />;
-  const toReset = resetting ? FNS.map(choicesOf) : [];
+  const toReset = resetting.map(choicesOf);
 
   return (
     <section className="results">
@@ -359,7 +359,7 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
           {T.results.folders}
         </button>
         {(hasChoices('dup') || hasChoices('junk')) && (
-          <button className="secondary" onClick={() => setResetting(true)}>
+          <button className="secondary" onClick={() => setResetting(FNS)}>
             {T.reset.button}
           </button>
         )}
@@ -401,6 +401,7 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
         onSave={(group, choice) => saveChoice(space, group, choice)}
         onIgnore={ignore}
         onRestore={(group) => restoreGroup(space, group)}
+        onReset={hasChoices(space) ? () => setResetting([space]) : undefined}
         onRemove={(exact) => setRemoving({ fn: space, exact: exact ?? null })}
       />
 
@@ -418,11 +419,12 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
           onConfirm={remove}
         />
       )}
-      {resetting && (
+      {resetting.length > 0 && (
         <ResetDialog
+          title={resetting.length > 1 ? T.reset.title : resetting[0] === 'dup' ? T.reset.titleDup : T.reset.titleJunk}
           sorted={toReset.reduce((s, c) => s + c.keys.length, 0)}
-          ignored={toReset.reduce((s, c) => s + c.rows.length, 0)}
-          onCancel={() => setResetting(false)}
+          ignored={toReset.reduce((s, c) => s + c.aside.length, 0)}
+          onCancel={() => setResetting([])}
           onConfirm={reset}
         />
       )}

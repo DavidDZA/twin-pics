@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 24/11/2026 (version 0.8.1). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 24/11/2026 (version 0.9). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -51,7 +51,11 @@
 > doublons d'un dossier à l'autre, copie du dossier le plus haut proposée (ordre à la poignée ⠿, comme Rank It All, demandé
 > pendant le premier essai), « À supprimer » dans chaque dossier.
 >
-> **Reprendre ici** : 0.8 en cours d'essai par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
+> (24/11) **Version 0.9**, retours pendant l'essai de la 0.8 : groupe mis de côté tout seul quand on garde plusieurs
+> doublons ou une photo inutile (ARCHITECTURE § 4.4) ; « Effacer mes choix » d'une seule page ; plus de voile
+> gris sur les photos à supprimer.
+>
+> **Reprendre ici** : essai en cours par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
 > dossiers, l'avertissement pour une sauvegarde. Ensuite, proposé : un vrai ménage de ses photos (seule l'utilisation
 > montrera les manques), puis l'**appli Android** (§ 5.3, **rien commencer sans son feu vert**). Petits plus possibles
 > avant, sur PC : astuces de première visite et annonce des nouvelles versions (§ 3), vidéos en double (§ 6).

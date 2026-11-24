@@ -61,6 +61,7 @@ export const pt: Dict = {
     },
     none: 'Nenhuma duplicada encontrada com estas configurações.',
     noneJunk: 'Nenhuma foto inútil encontrada com essas configurações.',
+    noneLeft: 'Nenhum grupo para separar: todos foram deixados de lado.',
     more: 'Ver mais',
     skipped: (unreadable, unsupported, videos) =>
       'Não analisados: ' +
@@ -135,6 +136,7 @@ export const pt: Dict = {
     validate: 'Confirmar',
     counts: (keep, remove) => `${keep} mantida${s(keep)}, ${remove} para apagar`,
     noneKept: 'Nenhuma foto mantida: o grupo inteiro será apagado.',
+    aside: 'As fotos mantidas serão deixadas de lado.',
     duelHelp: 'Toque na que você prefere.',
     duelOf: (i, n) => `Duelo ${i} de ${n}`,
     redoDuels: 'Refazer os duelos',
@@ -230,13 +232,17 @@ export const pt: Dict = {
   ignored: {
     done: 'Grupo deixado de lado.',
     title: (n) => `Grupos deixados de lado (${n})`,
-    help: 'Os grupos “Não são duplicadas” não são mais sugeridos.',
-    helpJunk: 'As fotos “Não são inúteis” não são mais sugeridas.',
+    help: 'Os grupos “Não são duplicadas”, e aqueles em que você manteve todas as fotos, não são mais sugeridos.',
+    helpJunk: 'As fotos “Não são inúteis”, e as que você manteve, não são mais sugeridas.',
     restore: 'Devolver à lista',
   },
   reset: {
     button: 'Limpar todas as minhas escolhas…',
-    title: 'Limpar minhas escolhas',
+    buttonDup: 'Limpar minhas escolhas de duplicadas…',
+    buttonJunk: 'Limpar minhas escolhas de fotos inúteis…',
+    title: 'Limpar todas as minhas escolhas',
+    titleDup: 'Limpar minhas escolhas de duplicadas',
+    titleJunk: 'Limpar minhas escolhas de fotos inúteis',
     sorted: (n) => (n === 1 ? `${n} foto volta a ficar por separar.` : `${n} fotos voltam a ficar por separar.`),
     ignored: (n) => (n === 1 ? `${n} grupo deixado de lado volta à lista.` : `${n} grupos deixados de lado voltam à lista.`),
     safe: 'Nenhuma foto é excluída nem movida.',

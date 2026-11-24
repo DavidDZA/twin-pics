@@ -59,6 +59,7 @@ export const de: Dict = {
     },
     none: 'Mit diesen Einstellungen wurden keine Duplikate gefunden.',
     noneJunk: 'Mit diesen Einstellungen wurden keine unnützen Fotos gefunden.',
+    noneLeft: 'Keine Gruppe mehr zu sortieren: Alle sind beiseitegelegt.',
     more: 'Mehr anzeigen',
     skipped: (unreadable, unsupported, videos) =>
       'Nicht analysiert: ' +
@@ -133,6 +134,7 @@ export const de: Dict = {
     validate: 'Bestätigen',
     counts: (keep, remove) => `${keep} behalten, ${remove} zu löschen`,
     noneKept: 'Kein Foto behalten: Die ganze Gruppe wird gelöscht.',
+    aside: 'Die behaltenen Fotos werden beiseitegelegt.',
     duelHelp: 'Tippe auf das, das dir besser gefällt.',
     duelOf: (i, n) => `Duell ${i} von ${n}`,
     redoDuels: 'Duelle wiederholen',
@@ -228,13 +230,17 @@ export const de: Dict = {
   ignored: {
     done: 'Gruppe beiseitegelegt.',
     title: (n) => `Beiseitegelegte Gruppen (${n})`,
-    help: 'Gruppen mit „Keine Duplikate“ werden nicht mehr vorgeschlagen.',
-    helpJunk: 'Fotos mit „Nicht unnütz“ werden nicht mehr vorgeschlagen.',
+    help: 'Gruppen mit „Keine Duplikate“ und solche, deren Fotos du alle behalten hast, werden nicht mehr vorgeschlagen.',
+    helpJunk: 'Fotos mit „Nicht unnütz“ und die, die du behalten hast, werden nicht mehr vorgeschlagen.',
     restore: 'Zurück in die Liste',
   },
   reset: {
     button: 'Gesamte Auswahl zurücksetzen…',
-    title: 'Auswahl zurücksetzen',
+    buttonDup: 'Auswahl der Duplikate zurücksetzen…',
+    buttonJunk: 'Auswahl der unnützen Fotos zurücksetzen…',
+    title: 'Gesamte Auswahl zurücksetzen',
+    titleDup: 'Auswahl der Duplikate zurücksetzen',
+    titleJunk: 'Auswahl der unnützen Fotos zurücksetzen',
     sorted: (n) => (n === 1 ? `${n} Foto ist wieder zu sortieren.` : `${n} Fotos sind wieder zu sortieren.`),
     ignored: (n) => (n === 1 ? `${n} beiseitegelegte Gruppe kommt zurück in die Liste.` : `${n} beiseitegelegte Gruppen kommen zurück in die Liste.`),
     safe: 'Kein Foto wird gelöscht oder verschoben.',
