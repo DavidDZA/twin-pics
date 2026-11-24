@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 24/11/2026 (version 0.10). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 24/11/2026 (version 0.11). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -57,6 +57,8 @@
 >
 > (24/11) **Version 0.10** : les **rafales** rangées parmi les quasi identiques passent dans les similaires, avec la plus nette
 > proposée (ARCHITECTURE § 3.3) ; trouvées pendant l'essai des visages (§ 6.2). Comparaison avec les autres applis : § 7.
+>
+> (24/11) **Version 0.11** : date lue dans le **nom du fichier** quand la photo n'a pas de date EXIF (ARCHITECTURE § 3).
 >
 > **Reprendre ici** : essai en cours par l'utilisateur. À regarder : le clic de plus (« Analyser »), l'ordre des
 > dossiers, l'avertissement pour une sauvegarde. Ensuite, proposé : un vrai ménage de ses photos (seule l'utilisation
@@ -190,8 +192,7 @@ visage, 384 px). 41 ms par photo et 23 ms par visage, sur le processeur.
   famille, ou pour Android. **Jamais** une raison de jeter (bébé qui dort).
 - **Netteté du visage** : abandonnée (2 changements, 2 mauvais : un profil plus net préféré à un sourire).
 - **Photos pivotées ou en miroir** (empreintes dans les 8 sens) : aucune vraie, 150 fausses paires ; abandonné.
-- **Rafales sans date EXIF** : 6 groupes quasi identiques de `photos test` ; leur date est dans le nom du fichier
-  (`IMG_20210505_172047.jpg`). La lire les rangerait dans les similaires, et permettrait de chercher leurs photos similaires.
+- ~~Rafales sans date EXIF : lire la date dans le nom du fichier~~ — fait le 24/11 (0.11).
 
 ## 7. Les autres applis (24/11/2026)
 

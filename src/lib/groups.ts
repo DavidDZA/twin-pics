@@ -34,8 +34,10 @@ export interface PhotoInfo {
   /** SHA-256 du fichier : calculé seulement si un autre fichier a la même taille. */
   sha?: string;
   dhash?: string;
-  /** Prise de vue (date EXIF), en millisecondes. */
+  /** Prise de vue (date EXIF, sinon lue dans le nom du fichier), en millisecondes. */
   time?: number;
+  /** La date vient du nom du fichier (`nameDate.ts`). */
+  named?: boolean;
   /** Vecteur du modèle, normalisé. */
   emb?: Float32Array;
   sharpness?: number;
@@ -160,14 +162,18 @@ const BURST_GAP = 1000;
  * et sa copie. Leurs dates les trahissent : une copie garde la date de l'originale. Rend les prises de vue à départager
  * (datées, et de la plus grande définition : une copie réduite n'en est pas une), ou `null` si ce n'est pas une rafale.
  * Deux dates trop éloignées (plus que l'écart réglé) ne prouvent rien : un logiciel a pu réécrire celle d'une retouche.
+ * Les dates EXIF et celles lues dans les noms sont comparées à part (1 à 3 s d'écart pour une même photo) : une photo et sa
+ * copie sans EXIF ne sont pas une rafale. Les photos à date EXIF d'abord : les autres peuvent en être des copies.
  */
 export function burstShots(photos: PhotoInfo[], members: number[], window: number): number[] | null {
   const top = Math.max(...members.map((i) => pixels(photos[i])));
   if (!top) return null;
-  const shots = members.filter((i) => photos[i].time !== undefined && pixels(photos[i]) === top);
-  const times = shots.map((i) => photos[i].time!).sort((a, b) => a - b);
-  const burst = times.some((t, k) => k > 0 && t - times[k - 1] >= BURST_GAP && t - times[k - 1] <= window);
-  return burst ? shots : null;
+  for (const named of [false, true]) {
+    const shots = members.filter((i) => photos[i].time !== undefined && !!photos[i].named === named && pixels(photos[i]) === top);
+    const times = shots.map((i) => photos[i].time!).sort((a, b) => a - b);
+    if (times.some((t, k) => k > 0 && t - times[k - 1] >= BURST_GAP && t - times[k - 1] <= window)) return shots;
+  }
+  return null;
 }
 
 /** Pourquoi la photo suggérée est proposée. */

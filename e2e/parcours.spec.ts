@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { join } from 'node:path';
-import { KEY_DIR, openPhotos, PHOTOS_DIR } from './photos';
+import { KEY_DIR, NAMED_DIR, openPhotos, PHOTOS_DIR } from './photos';
 
 /** Analyse le dossier d'essai (par le champ d'envoi de dossier), photos similaires comprises ou non : les doublons s'ouvrent. */
 async function analyze(page: Page, similar = false) {
@@ -366,6 +366,27 @@ test('langue : en anglais, toute l’interface suit', async ({ page }) => {
   await expect(page.getByText('Suggestion · the original')).toBeVisible();
 });
 
+/** Le dossier sans date EXIF. */
+async function analyzeNamed(page: Page, similar: boolean) {
+  await page.goto('/');
+  const box = page.getByRole('checkbox', { name: /photos similaires/ });
+  if ((await box.isChecked()) !== similar) await box.click();
+  await page.getByRole('checkbox', { name: /documents, tickets et mèmes/ }).uncheck();
+  await page.getByTestId('folder-input').setInputFiles(NAMED_DIR);
+  await page.getByRole('button', { name: 'Analyser' }).click();
+  await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: similar ? 120_000 : 30_000 });
+}
+
+test('sans date EXIF : date lue dans le nom, rafale dans les similaires, la plus nette proposée', async ({ page }) => {
+  await analyzeNamed(page, false);
+  await page.getByRole('tab', { name: /Similaires/ }).click();
+  const group = page.getByTestId('group');
+  await expect(group).toHaveCount(1);
+  await expect(group.locator('li.best .name')).toHaveText('IMG_20230610_101503.jpg');
+  await expect(group.getByText('Suggestion · la plus nette')).toBeVisible();
+  await expect(group.getByText(/10 juin 2023/).first()).toBeVisible();
+});
+
 /** La rafale d'essai (cadrage décalé, plus claire, floue) dans l'onglet « Similaires », la plus nette proposée. */
 async function expectBurst(page: Page) {
   await page.getByText('Réglages de la détection').click();
@@ -395,6 +416,15 @@ test.describe('modèle des photos similaires (téléchargé : E2E_MODELE=1)', ()
     await analyze(page, true);
     await expect(page.getByText(/Photos similaires calculées par le processeur/)).toBeVisible();
     await expectBurst(page);
+  });
+
+  test('sans date EXIF : photos similaires cherchées d’après la date du nom', async ({ page }) => {
+    await analyzeNamed(page, true);
+    await page.getByText('Réglages de la détection').click();
+    await page.locator('.slider', { hasText: 'ressemblance minimale' }).locator('input').fill('80');
+    await page.getByRole('tab', { name: /Similaires/ }).click();
+    await expect(page.getByTestId('group')).toHaveCount(2);
+    await expect(page.getByTestId('group').nth(1).locator('li.best .name')).toHaveText('IMG_20230610_203000.jpg');
   });
 
   test('photos similaires demandées après une analyse sans elles : les photos déjà vues sont complétées', async ({ page }) => {

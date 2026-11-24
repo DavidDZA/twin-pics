@@ -178,6 +178,27 @@ describe('rafales parmi les quasi identiques', () => {
     expect(photos[g.best].path).toBe('2.jpg');
   });
 
+  it('dates lues dans les noms : rafale aussi', () => {
+    const photos = [{ ...shot('a.jpg', 0, 0.2), named: true }, { ...shot('b.jpg', 1, 0.6, 2), named: true }];
+    const [g] = group(photos);
+    expect(g.kind).toBe('similar');
+    expect(photos[g.best].path).toBe('b.jpg');
+  });
+
+  it('une photo et sa copie sans EXIF (date du nom, à 2 s près) : toujours « quasi identiques »', () => {
+    const photos = [{ ...shot('a.jpg', 0, 0.2), size: 5_000_000 }, { ...shot('copie.jpg', 2, 0.9, 2), named: true }];
+    const [g] = group(photos);
+    expect(g.kind).toBe('near');
+    expect(photos[g.best].path).toBe('a.jpg');
+  });
+
+  it('une rafale et les copies sans EXIF de ses photos : jamais une copie proposée', () => {
+    const photos = [shot('1.jpg', 0, 0.2), shot('2.jpg', 4, 0.5, 2), { ...shot('c1.jpg', 2, 0.8, 1), named: true }, { ...shot('c2.jpg', 6, 0.9, 3), named: true }];
+    const [g] = group(photos);
+    expect(g.kind).toBe('similar');
+    expect(photos[g.best].path).toBe('2.jpg');
+  });
+
   it('définition ou dates inconnues : « quasi identiques »', () => {
     expect(group([photo({ path: 'a.jpg', dhash: HASH, time: 0 }), photo({ path: 'b.jpg', dhash: flip(HASH, 2), time: 3000 })])[0].kind).toBe('near');
     expect(group([photo({ path: 'a.jpg', dhash: HASH, ...size }), photo({ path: 'b.jpg', dhash: flip(HASH, 2), ...size })])[0].kind).toBe('near');
@@ -254,5 +275,12 @@ describe('photos qui ont besoin du modèle', () => {
     const row = (key: string, time?: number, error?: string): PhotoRow => ({ key, path: key, size: 1, lastModified: 1, time, error });
     const rows = [row('seule', 0), row('a', 100 * MIN), row('b', 101 * MIN), row('sans-date'), row('illisible', 101 * MIN, 'decode')];
     expect(needsVector(rows).map((r) => r.key)).toEqual(['a', 'b']);
+  });
+
+  it('une photo datée par son nom en est une, la date EXIF passe avant', () => {
+    const row = (path: string, time?: number): PhotoRow => ({ key: path, path, size: 1, lastModified: 1, time });
+    const at = new Date(2021, 4, 5, 17, 20, 47).getTime();
+    expect(needsVector([row('D/IMG_20210505_172047.jpg'), row('exif.jpg', at + MIN), row('D/IMG_20210505_235900.jpg')]).map((r) => r.key)).toEqual(['D/IMG_20210505_172047.jpg', 'exif.jpg']);
+    expect(needsVector([row('D/IMG_20210505_172047.jpg', at - 100 * MIN), row('exif.jpg', at + MIN)])).toHaveLength(0);
   });
 });

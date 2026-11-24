@@ -18,6 +18,9 @@ export const PHOTOS_DIR = path.join(import.meta.dirname, '.photos', 'Mes photos'
 /** Un deuxième dossier (une clé USB) : deux copies exactes de « Mes photos », et une photo à part. */
 export const KEY_DIR = path.join(import.meta.dirname, '.photos', 'Clé');
 
+/** Des photos sans date EXIF, datées par leur nom : une rafale presque identique, une autre au cadrage décalé (modèle). */
+export const NAMED_DIR = path.join(import.meta.dirname, '.photos', 'Sans date');
+
 /** Site : ajoute le dossier d'essai par le champ d'envoi (la fenêtre de choix ne s'automatise pas), puis « Analyser ». */
 export async function openPhotos(page: Page, analyze = 'Analyser'): Promise<void> {
   await page.getByTestId('folder-input').setInputFiles(PHOTOS_DIR);
@@ -83,6 +86,15 @@ export async function makePhotos(): Promise<void> {
   fs.writeFileSync(path.join(ratees, 'Screenshot_20240714-101112.png'), await sharp(screenSvg('Marie', '#075e54', ['Salut !', 'On se voit demain ?', 'Oui, où ça ?', 'Au café de la plage', 'À 15 h ?'])).png().toBuffer());
   fs.writeFileSync(path.join(ratees, 'Screenshot_20240802-184501.png'), await sharp(screenSvg('Paul', '#3b5998', ['Tu as les photos ?', 'Lesquelles ?', 'Celles du mariage', 'Je les envoie ce soir', 'Merci !', 'De rien'])).png().toBuffer());
   fs.writeFileSync(path.join(ratees, 'page.jpg'), await sharp(pageSvg()).withExif(exif('2023:02:01 09:00:00')).jpeg({ quality: 85 }).toBuffer());
+
+  // Sans date EXIF.
+  fs.mkdirSync(NAMED_DIR, { recursive: true });
+  const lac = await sharp(photoSvg(41, 1600, 1200)).png().toBuffer();
+  fs.writeFileSync(path.join(NAMED_DIR, 'IMG_20230610_101500.jpg'), await sharp(lac).blur(2).jpeg({ quality: 100 }).toBuffer());
+  fs.writeFileSync(path.join(NAMED_DIR, 'IMG_20230610_101503.jpg'), await sharp(lac).jpeg({ quality: 70 }).toBuffer());
+  const fete = { width: 1400, height: 1050 };
+  fs.writeFileSync(path.join(NAMED_DIR, 'IMG_20230610_203000.jpg'), await sharp(scene).extract({ left: 0, top: 0, ...fete }).jpeg({ quality: 90 }).toBuffer());
+  fs.writeFileSync(path.join(NAMED_DIR, 'IMG_20230610_203004.jpg'), await sharp(scene).extract({ left: 200, top: 150, ...fete }).modulate({ brightness: 1.1 }).blur(2).jpeg({ quality: 90 }).toBuffer());
 
   // La clé USB : copies plus anciennes (dates de fichier) que les photos du PC.
   fs.mkdirSync(path.join(KEY_DIR, 'Sauvegarde'), { recursive: true });

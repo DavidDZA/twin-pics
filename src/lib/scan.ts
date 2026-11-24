@@ -21,6 +21,7 @@ import { LIMITS, type Pair, type PhotoInfo } from './groups';
 import type { AnalyzeRequest, AnalyzeResult, EmbedMessage, EmbedRequest, ModelDevice, Pixels } from './messages';
 import type { FoundFile, Listing } from './files';
 import { nameOf } from './filetypes';
+import { nameTime } from './nameDate';
 import { DEVICE_KEY, embedId } from './model';
 import { clipId } from './junk';
 import { QUALITY_VERSION } from './quality';
@@ -92,6 +93,9 @@ function forcedDevice(): 'auto' | 'wasm' {
   }
 }
 
+/** Prise de vue : date EXIF (en base), sinon lue dans le nom du fichier (jamais en base : rien à réanalyser). */
+const shotTime = (row: PhotoRow) => row.time ?? nameTime(row.path);
+
 function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string | undefined, rank: number | undefined): PhotoInfo {
   return {
     key: row.key,
@@ -101,7 +105,8 @@ function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string 
     lastModified: row.lastModified,
     sha: row.sha,
     dhash: row.dhash,
-    time: row.time,
+    time: shotTime(row),
+    named: row.time === undefined && shotTime(row) !== undefined,
     emb: modelId && row.embModel === modelId ? row.emb : undefined,
     sharpness: row.sharpness,
     width: row.width,
@@ -115,13 +120,19 @@ function toInfo(row: PhotoRow, modelId: string | undefined, clipModelId: string 
 
 /** Photos datées qui ont au moins une autre photo à moins de `LIMITS.windowMin` : celles qui ont besoin du modèle. */
 export function needsVector(rows: PhotoRow[]): PhotoRow[] {
-  const timed = rows.filter((r) => r.time !== undefined && !r.error).sort((a, b) => a.time! - b.time!);
+  const timed = rows
+    .filter((r) => !r.error)
+    .map((row) => ({ row, time: shotTime(row) }))
+    .filter((r): r is { row: PhotoRow; time: number } => r.time !== undefined)
+    .sort((a, b) => a.time - b.time);
   const window = LIMITS.windowMin * 60_000;
-  return timed.filter((r, i) => {
-    const prev = timed[i - 1];
-    const next = timed[i + 1];
-    return (prev && r.time! - prev.time! <= window) || (next && next.time! - r.time! <= window);
-  });
+  return timed
+    .filter((r, i) => {
+      const prev = timed[i - 1];
+      const next = timed[i + 1];
+      return (prev && r.time - prev.time <= window) || (next && next.time - r.time <= window);
+    })
+    .map((r) => r.row);
 }
 
 /** Version de chaque modèle à la dernière analyse (meta `models`) : inutile de le charger si toutes l'ont déjà vue. */
@@ -243,7 +254,8 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   );
   const dino = opts.similar && !dinoReady ? slot((b) => loadModel(() => new Worker(new URL('./embed.worker.ts', import.meta.url), { type: 'module' }), embedId, b)) : null;
   const clip = opts.junkModel && !clipReady ? slot((b) => loadModel(() => new Worker(new URL('./clip.worker.ts', import.meta.url), { type: 'module' }), clipId, b)) : null;
-  const wantPixels: AnalyzeRequest['wantPixels'] = clip ? 'all' : dino ? 'dated' : 'none';
+  /** Le worker ne connaît que la date EXIF : une photo datée par son nom demande son entrée du modèle d'office. */
+  const wantPixels = (row: PhotoRow): AnalyzeRequest['wantPixels'] => (clip || (dino && nameTime(row.path) !== undefined) ? 'all' : dino ? 'dated' : 'none');
 
   const analyzers = new WorkerPool<AnalyzeRequest, AnalyzeResult>(
     Array.from({ length: Math.max(1, Math.min(poolSize(), todo.length || 1)) }, () => new Worker(new URL('./analyze.worker.ts', import.meta.url), { type: 'module' })),
@@ -316,7 +328,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
         inFlight.run(async () => {
           if (signal.aborted) throw abortError();
           const buffer = await read(row);
-          const res = await analyzers.call({ id: 0, buffer, mode: 'full', needSha: needSha(row), wantPixels }, [buffer]);
+          const res = await analyzers.call({ id: 0, buffer, mode: 'full', needSha: needSha(row), wantPixels: wantPixels(row) }, [buffer]);
           const { thumb, pixels, id: _id, ok, ...fields } = res;
           Object.assign(row, fields, { error: ok ? undefined : res.error, qv: QUALITY_VERSION });
           pendingRows.push(row);
@@ -324,7 +336,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
           analyzed++;
           if (analyzed % SAVE_EVERY === 0) writes.push(flush());
           onProgress({ phase: 'analyze', done: analyzed, total: todo.length });
-          if (pixels) await toModels(row, pixels, row.time !== undefined, true);
+          if (pixels) await toModels(row, pixels, shotTime(row) !== undefined, true);
         }),
       ),
     );

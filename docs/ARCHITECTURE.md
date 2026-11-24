@@ -1,6 +1,6 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 24/11/2026 (version 0.10 : **doublons et photos inutiles
+> **À lire en premier par toute nouvelle session de travail.** État au 24/11/2026 (version 0.11 : **doublons et photos inutiles
 > séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
 > de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
@@ -104,6 +104,7 @@ src/
     junk.ts            photos inutiles : raisons, scores MobileCLIP, groupes (code pur) ; junkPrompts.json
     clip.worker.ts     MobileCLIP (vecteur de 512 nombres par photo)
     folders.ts         liste des dossiers (ajout, ordre, noms), § 1.1 ; components/FolderList : la poignée ⠿
+    nameDate.ts        date de prise de vue lue dans le nom du fichier (code pur), § 3
     display.ts         chemins affichés à partir du dossier analysé
     scan.ts            l'analyse de bout en bout (base, lecture, workers, modèle, paires)
     pool.ts            limiter les tâches simultanées (Limiter), faire travailler des workers (WorkerPool)
@@ -198,7 +199,12 @@ MobileCLIP (photos inutiles, `clip.worker.ts`). Ils reçoivent la même petite v
    dur ralentit s'il saute d'un fichier à l'autre), et le transfère au worker (sans copie). Au plus « workers + 4 »
    photos en mémoire à la fois.
 5. **Analyse** dans les workers (`analyze.worker.ts`, un par cœur moins un, 6 au plus) :
-   - date de prise de vue (`DateTimeOriginal`, sinon `CreateDate`) et appareil (EXIF) ;
+   - date de prise de vue (`DateTimeOriginal`, sinon `CreateDate`) et appareil (EXIF). Sans date EXIF, celle **du nom du
+     fichier** (0.11, `nameDate.ts`) : `IMG_20210505_172047.jpg`, `20240428_130249.jpg`, `PXL_…` (heure universelle),
+     `2021-05-05 17.20.47.jpg`. Seulement des JPEG, une date et une heure complètes ; jamais dans un dossier de messagerie
+     (date de l'envoi), ni pour une capture d'écran. Calculée à chaque analyse (`shotTime`), jamais en base : rien à relire,
+     sauf les photos qui ont alors besoin du modèle. Vérifié sur `photos test` : 1 464 sur 1 468 à 4 s au plus de leur date
+     EXIF, mais souvent à 1 à 3 s (d'où la règle des rafales, § 3.3) ;
    - décodage avec l'orientation EXIF ; petite version de 256 px → **dHash** ; version de 1024 px → **netteté** et
      **mesures de qualité** (`quality.ts`, § 4.3) ;
    - **miniature** JPEG de 200 px (table `thumbs`) ;
@@ -265,8 +271,9 @@ Rafale d'essai (cadrage décalé de 14 %, plus claire, floue) : 0,877.
   suggestions changent). Les dates tranchent : au moins deux photos datées, de la plus grande définition du groupe, à 1 s
   d'écart au moins (précision de l'EXIF) et `windowMin` au plus. La suggestion se choisit parmi ces prises de vue : jamais
   une copie réduite ou sans date (WhatsApp), même jugée plus nette. Même date = copie ou retouche : rien ne change. Sans
-  modèle, donc aussi quand les photos similaires ne sont pas demandées. Sans date EXIF, la rafale reste « quasi identique »
-  (les 6 autres groupes : ROADMAP § 6).
+  modèle, donc aussi quand les photos similaires ne sont pas demandées. Les dates EXIF et celles des noms (0.11) sont
+  comparées **à part** : une photo et sa copie sans EXIF ont 1 à 3 s d'écart sans être une rafale. Les EXIF d'abord, les
+  autres pouvant être leurs copies.
 - **Suggestion** (`suggestBest`) : copies exactes → celle du dossier le plus haut (§ 1.1), sinon l'originale (pas dans un dossier WhatsApp, Telegram,
   téléchargements, pas de « (1) » ni « Copie » dans le nom ; puis la plus ancienne, puis le chemin le plus court) ;
   quasi identiques → la plus grande définition, puis le plus gros fichier ; similaires → la plus nette.
@@ -478,6 +485,9 @@ durées par `Intl` (`bytes`, `duration`).
   (50 badges différents et traduits, seuils, gardés après une annulation, annonce une seule fois, compteurs et records), `zoom.test.ts` (point fixe, bornes, deux doigts),
   `db.test.ts` (base de la 0.4 reprise), `groups.test.ts` (photos noires au bruit trompeur), `choices.test.ts` (copies
   exactes d'un coup).
+- **Dates des noms** (`nameDate.test.ts`) : noms d'appareils, Pixel, date sans heure, numéros, captures, dates impossibles ou à
+  venir, messageries ; `groups.test.ts` : rafale datée par les noms, copies sans EXIF, photos qui ont besoin du modèle ;
+  Playwright : dossier sans EXIF (rafale, date affichée ; avec `E2E_MODELE=1`, photos similaires).
 - **Photos inutiles** (`junk.test.ts`) : mesures sur des images générées (nette, floue partout, sujet net sur fond
   flou, sombre, brûlée, vide), chaque règle, captures par le nom ou les proportions, certitude du modèle, « prise par
   erreur » seulement si ratée, raisons décochées, phrases livrées (normalisées, toutes les catégories), groupes sans
