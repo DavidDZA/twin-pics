@@ -1,0 +1,103 @@
+# Appli Android : l'interface construite par Vite, emballée par Capacitor (android/), compilée ici (rien à installer sur
+# le PC), puis essayée sur un téléphone simulé. Avec les secrets de signature, l'appli signée pour la Play Console
+# (twin-pics.aab) est dans les artefacts ; sans eux, seulement l'APK d'essai.
+#
+# Secrets : ANDROID_KEYSTORE_BASE64 (clé de dépôt .p12, alias « upload », en base64) et ANDROID_KEYSTORE_PASSWORD.
+name: Appli Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, android]
+    paths: ['android/**', 'src/**', 'e2e-android/**', 'package.json', 'package-lock.json', 'capacitor.config.json', 'playwright.android.config.ts', '.github/workflows/android.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm test
+      - run: npm run android
+
+      - name: Compilation
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          # En cas d'échec, l'erreur de Gradle est remontée en annotation (lisible sans ouvrir les journaux).
+          set +o pipefail
+          ./gradlew --no-daemon assembleDebug bundleRelease 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+          if [ "${PIPESTATUS[0]}" != 0 ]; then
+            { grep -E "error:|^e: " "$RUNNER_TEMP/gradle.log"; grep -A15 "What went wrong" "$RUNNER_TEMP/gradle.log"; } | head -40 | sed 's/^/::error::/'
+            exit 1
+          fi
+          ls -l app/build/outputs/apk/debug/*.apk app/build/outputs/bundle/release/*.aab
+
+      - name: Accélération du téléphone simulé
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Essai sur un téléphone simulé
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          E2E_MODELE: '1'
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 4096
+          script: npm run e2e:android
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: essai-android
+          path: |
+            test-results/android-*
+            android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Signature pour la Play Console
+        if: github.ref == 'refs/heads/main'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::notice::Secrets ANDROID_KEYSTORE_* absents : pas d'appli signée pour la Play Console."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-key.p12"
+          jarsigner -keystore "$RUNNER_TEMP/upload-key.p12" -storetype PKCS12 -storepass:env KEYSTORE_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 -signedjar twin-pics.aab android/app/build/outputs/bundle/release/app-release.aab upload
+          rm "$RUNNER_TEMP/upload-key.p12"
+          jarsigner -verify twin-pics.aab | tail -1
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: twin-pics-android
+          path: twin-pics.aab
+          retention-days: 30
+          if-no-files-found: ignore

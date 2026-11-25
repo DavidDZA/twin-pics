@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom';
 import { T, bytes, day, num } from '../i18n';
 import { BADGES, FAMILIES, measure, type Earned, type Stats } from '../lib/stats';
 import { readStats } from '../lib/statsStore';
+import { useBack } from '../lib/back';
 
 /** Stats (depuis la version 0.5) et les cinquante badges, ouverts depuis le haut de l'appli. */
 export function StatsDialog({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<{ stats: Stats; earned: Earned } | null>(null);
 
+  useBack(onClose);
   useEffect(() => {
     void readStats().then(setData);
   }, []);

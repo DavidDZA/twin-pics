@@ -77,7 +77,7 @@ export const fr = {
     elapsed: (time: string, analyzed: number) =>
       analyzed ? `Analyse faite en ${time} (${analyzed} photo${s(analyzed)} nouvelle${s(analyzed)}).` : `Analyse faite en ${time}, rien de nouveau.`,
     device: (gpu: boolean): string =>
-      gpu ? 'Photos similaires calculées par la carte graphique.' : 'Photos similaires calculées par le processeur, plus lent : la carte graphique n’est pas disponible dans ce navigateur.',
+      gpu ? 'Photos similaires calculées par la carte graphique.' : 'Photos similaires calculées par le processeur, plus lent : la carte graphique n’est pas disponible ici.',
     folders: 'Dossiers…',
     inFolders: (names: string) => `Dossiers : ${names}.`,
     rescan: 'Relancer',
@@ -346,6 +346,23 @@ export const fr = {
       ignored: 'groupes mis de côté',
       zooms: 'photos regardées en zoom',
     },
+  },
+  android: {
+    privacy: 'Tout se passe sur ton téléphone : aucune photo n’est envoyée, rien n’est supprimé sans ta confirmation.',
+    allow: 'Autoriser l’accès à mes photos',
+    refused: 'Twin Pics n’a pas accès à tes photos. Tu peux l’autoriser dans les réglages du téléphone : Autorisations, Photos et vidéos.',
+    settings: 'Ouvrir les réglages',
+    some: 'Twin Pics ne voit que les photos que tu as choisies.',
+    changeAccess: 'Changer les photos autorisées',
+    albums: (on: number, total: number) => (on === total ? `Dossiers : tous (${total})` : `Dossiers : ${on} sur ${total}`),
+    checkAll: 'Tout cocher',
+    uncheckAll: 'Tout décocher',
+    empty: 'Aucune photo trouvée sur ce téléphone.',
+    phone: 'Téléphone',
+    analyze: (shown: string, n: number) => `Analyser ${shown} photo${s(n)}`,
+    slow: 'Sur un téléphone, ces deux recherches peuvent être longues : essaie d’abord sans. L’écran reste allumé pendant l’analyse ; garde l’appli ouverte. Ce qui est déjà analysé est retenu.',
+    trashHelp: 'Elles vont dans la corbeille du téléphone, d’où tu peux les récupérer pendant 30 jours. Android te demandera de confirmer.',
+    doneTrash: 'Elles sont dans la corbeille du téléphone pendant 30 jours ; la place est libérée ensuite, ou quand tu la vides.',
   },
   language: 'Langue',
 };

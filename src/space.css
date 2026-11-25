@@ -330,3 +330,79 @@
 .folder-choice.several code {
   flex-basis: 100%;
 }
+
+/* Appli Android : les dossiers de la galerie */
+.gallery-note {
+  margin-top: 22px;
+}
+
+.gallery-note p {
+  margin: 0 0 8px;
+}
+
+.albums {
+  margin-top: 22px;
+}
+
+.albums-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.albums .actions-row {
+  margin: 10px 0;
+}
+
+.albums ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.albums li + li {
+  border-top: 1px solid var(--border);
+}
+
+.albums label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.albums input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand-a);
+}
+
+.albums .folder-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.albums .folder-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

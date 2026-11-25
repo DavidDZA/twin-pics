@@ -2,7 +2,7 @@
   "name": "twin-pics",
   "productName": "Twin Pics",
   "private": true,
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Retrouver les photos en double et garder la meilleure",
   "license": "MIT",
   "author": "Super Bobiz",
@@ -19,9 +19,15 @@
     "e2e": "playwright test",
     "e2e:pc": "npm run build && playwright test --config playwright.pc.config.ts",
     "e2e:exe": "node scripts/e2e-exe.mjs",
-    "icon": "node scripts/make-icon.mjs"
+    "android": "npm run build && cap sync android",
+    "e2e:android": "playwright test --config playwright.android.config.ts",
+    "icon": "node scripts/make-icon.mjs",
+    "icon:android": "node scripts/make-android-icon.mjs"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
     "@huggingface/transformers": "^4.3.2",
     "@playwright/test": "^1.65.1",
     "@types/node": "^26.6.6",

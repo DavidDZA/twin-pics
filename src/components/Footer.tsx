@@ -1,5 +1,5 @@
 import { LANG, LANG_NAMES, LANGS, T, setLanguage, type Lang } from '../i18n';
-import { RELEASES_URL, desktop } from '../platform';
+import { RELEASES_URL, android, desktop } from '../platform';
 
 export function Footer() {
   return (
@@ -15,7 +15,7 @@ export function Footer() {
         </select>
       </label>
       <span className="links">
-        {!desktop && (
+        {!desktop && !android && (
           <a href={RELEASES_URL} target="_blank" rel="noreferrer">
             {T.app.getPc}
           </a>

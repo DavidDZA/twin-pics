@@ -8,6 +8,7 @@ import { shortPath } from '../lib/display';
 import type { Choice } from '../lib/choices';
 import { clampZoom, FIT, pinch, wheelFactor, ZOOM_CLOSE, ZOOM_STEP, zoomAt, type Zoom } from '../lib/zoom';
 import { addStats } from '../lib/statsStore';
+import { useBack } from '../lib/back';
 import { photoDetails } from './photoText';
 
 interface Props {
@@ -43,6 +44,8 @@ export function Viewer({ group, start, photos, files, onClose, choice, onToggle 
   const moved = useRef(false);
   const prev = () => setIndex((i) => (i + count - 1) % count);
   const next = () => setIndex((i) => (i + 1) % count);
+
+  useBack(onClose);
 
   // Badge « Détective » : photos regardées en zoom.
   const zoomed = zoom.scale > 1;

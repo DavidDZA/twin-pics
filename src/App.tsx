@@ -1,6 +1,6 @@
 /**
  * Trois écrans : départ (liste des dossiers), analyse (progression), résultats (doublons et photos inutiles, deux
- * fonctions séparées). Stats et badges : bouton en haut. Même interface sur le site et dans l'appli PC (`platform/`), qui seule supprime des photos.
+ * fonctions séparées). Stats et badges : bouton en haut. Même interface sur le site, dans l'appli PC et l'appli Android (`platform/`) ; le site ne supprime pas.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { T } from './i18n';
@@ -9,7 +9,11 @@ import { addFolder, folderLabels, folderName, uniqueNames, type Folder } from '.
 import { scan, type Progress, type ScanResult } from './lib/scan';
 import { getMeta, setMeta } from './lib/db';
 import { notify } from './lib/notify';
-import { desktop, listDesktop, readRemoveSettings } from './platform';
+import { android, desktop, listDesktop, readRemoveSettings } from './platform';
+import { listGallery } from './platform/android';
+import { useGallery } from './components/useGallery';
+import { useBack } from './lib/back';
+import { albumsOf } from './lib/albums';
 import { StartScreen } from './components/StartScreen';
 import { ScanScreen } from './components/ScanScreen';
 import { Results } from './components/Results';
@@ -34,12 +38,12 @@ const JUNK_KEY = 'opt-junk-model';
 /** Site : accès aux dossiers de la dernière fois (meta) ; `folder` : le seul, jusqu'à la 0.7. */
 const FOLDERS_META = 'folders';
 
-/** Une option de la page de départ (cochée par défaut), retenue. */
+/** Une option de la page de départ, retenue (cochée par défaut ; pas sur un téléphone : long, et un gros téléchargement). */
 function readOption(key: string): boolean {
   try {
-    return localStorage.getItem(key) !== 'false';
+    return (localStorage.getItem(key) ?? String(!android)) === 'true';
   } catch {
-    return true;
+    return !android;
   }
 }
 
@@ -53,6 +57,7 @@ function saveOption(key: string, v: boolean): void {
 
 /** Les dossiers de la dernière fois. */
 async function readFolders(): Promise<Folder[]> {
+  if (android) return [];
   if (desktop) return (await desktop.lastFolders()).map((f) => ({ kind: 'desktop', ...f }));
   if (!canPickDirectory()) return [];
   const one = await getMeta<FileSystemDirectoryHandle>('folder');
@@ -67,10 +72,12 @@ function saveFolders(list: Folder[]): void {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'start' });
+  useBack(() => setScreen({ name: 'start' }), screen.name === 'results');
   const [folders, setFoldersState] = useState<Folder[]>([]);
   const [similar, setSimilarState] = useState(() => readOption(SIMILAR_KEY));
   const [junkModel, setJunkModelState] = useState(() => readOption(JUNK_KEY));
   const [stats, setStats] = useState(false);
+  const gallery = useGallery();
   const abort = useRef<AbortController | null>(null);
 
   const setSimilar = (v: boolean) => (setSimilarState(v), saveOption(SIMILAR_KEY, v));
@@ -161,7 +168,32 @@ export default function App() {
     [similar, junkModel],
   );
 
+  /** Android : les dossiers cochés de la galerie, relue à chaque analyse. */
+  const analyzeGallery = async () => {
+    const controller = new AbortController();
+    abort.current = controller;
+    setScreen({ name: 'scan', progress: { phase: 'listing', done: 0, total: 0 } });
+    android!.keepAwake(true);
+    try {
+      const photos = await gallery.refresh();
+      const listing = listGallery(photos, gallery.off);
+      if (controller.signal.aborted) throw new DOMException('', 'AbortError');
+      const result = await scan(listing, { similar, junkModel, signal: controller.signal, onProgress: (progress) => setScreen({ name: 'scan', progress }) });
+      countScan(
+        result.photos.length,
+        albumsOf(photos).flatMap((a) => (gallery.off.has(a.path) ? [] : [a.path])),
+      );
+      setScreen({ name: 'results', result, scanned: { names: [], roots: [] } });
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') setScreen({ name: 'start' });
+      else setScreen({ name: 'start', error: T.scan.failed(String((err as Error).message ?? err)) });
+    } finally {
+      android!.keepAwake(false);
+    }
+  };
+
   const analyze = async () => {
+    if (android) return analyzeGallery();
     const list = await openFolders();
     if (list.length) await run(list);
     else setScreen({ name: 'start', error: T.start.noAccess });
@@ -184,6 +216,7 @@ export default function App() {
         {screen.name === 'start' && (
           <StartScreen
             canPick={!!desktop || canPickDirectory()}
+            gallery={android ? gallery : undefined}
             folders={folders}
             onFolders={setFolders}
             similar={similar}

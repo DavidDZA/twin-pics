@@ -1,14 +1,15 @@
 /**
  * La fenêtre « Avant de supprimer » : ce qui sera gardé et supprimé, groupe par groupe, et où vont les photos
  * (Corbeille de Windows ou dossier « À supprimer », au choix, retenu). Sur le site, la suppression n'existe pas :
- * la fenêtre le dit et propose l'appli PC.
+ * la fenêtre le dit et propose l'appli PC. Sur Android : toujours la corbeille du téléphone.
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { T, bytes } from '../i18n';
 import { usedRanks, type PhotoInfo } from '../lib/groups';
 import type { GroupPlan, Pending } from '../lib/choices';
-import { RELEASES_URL, desktop, removeFolders, type RemoveSettings } from '../platform';
+import { useBack } from '../lib/back';
+import { RELEASES_URL, android, desktop, removeFolders, type RemoveSettings } from '../platform';
 import { useThumbs } from './useThumbs';
 import { shortPath } from '../lib/display';
 
@@ -32,7 +33,7 @@ interface Props {
 }
 
 export function RemoveDialog({ pending, exact, photos, names, roots, settings, onSettings, working, onCancel, onConfirm }: Props) {
-  const canRemove = !!desktop && roots.length > 0;
+  const canRemove = !!android || (!!desktop && roots.length > 0);
   const targets = pending.remove.map((i) => photos[i]);
   const ranks = usedRanks(targets);
   const folders = removeFolders(settings, roots.length ? ranks.map((i) => roots[i]) : [], T.remove.folderName);
@@ -42,6 +43,8 @@ export function RemoveDialog({ pending, exact, photos, names, roots, settings, o
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, working]);
+
+  useBack(() => !working && onCancel());
 
   const chooseFolder = async () => {
     const picked = await desktop?.pickRemoveFolder(folders[0]);
@@ -78,7 +81,9 @@ export function RemoveDialog({ pending, exact, photos, names, roots, settings, o
         </ul>
         {pending.plans.length > SHOWN && <p className="muted small">{T.remove.more(pending.plans.length - SHOWN)}</p>}
 
-        {canRemove ? (
+        {android ? (
+          <p className="muted small">{T.android.trashHelp}</p>
+        ) : canRemove ? (
           <div className="where">
             <label className="field">
               <span>{T.remove.where}</span>

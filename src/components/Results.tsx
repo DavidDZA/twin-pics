@@ -17,7 +17,7 @@ import { notify } from '../lib/notify';
 import { sortedStats } from '../lib/stats';
 import { addStats } from '../lib/statsStore';
 import type { ScanResult } from '../lib/scan';
-import { desktop, readRemoveSettings, removeFolders, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
+import { android, desktop, readRemoveSettings, remover, removeFolders, saveRemoveSettings, type Move, type RemoveMode, type RemoveSettings } from '../platform';
 import { setDisplayRoots } from '../lib/display';
 import { buildJunkGroups, clipScores, junkReasons, JUNK_DEFAULTS, JUNK_REASONS, type JunkParams, type JunkPrompts } from '../lib/junk';
 import junkPrompts from '../lib/junkPrompts.json';
@@ -33,7 +33,6 @@ const JUNK_KEY = 'junk-params';
 const SPACE_KEY = 'last-function';
 const PROMPTS = junkPrompts as JunkPrompts;
 /** Photos envoyées à l'appli PC à la fois (pour suivre la progression). */
-const REMOVE_BATCH = 20;
 
 const table = (fn: Fn) => (fn === 'dup' ? db.marks : db.junkMarks);
 const FNS: Fn[] = ['dup', 'junk'];
@@ -278,21 +277,22 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
     );
 
   const remove = async () => {
-    if (!desktop || !roots.length || !removing) return;
+    if (!remover || (desktop && !roots.length) || !removing) return;
     const { fn } = removing;
     const plan = removing.exact ?? pending[fn];
     const targets = plan.remove.map((i) => photos[i]);
     const exactKeys = new Set(plan.plans.filter((p) => p.group.kind === 'exact').flatMap((p) => p.remove.map((i) => photos[i].key)));
     const byPath = new Map(targets.map((p) => [p.path, p]));
-    const { mode, folder } = removeSettings;
-    const folders = removeFolders(removeSettings, usedRanks(targets).map((i) => roots[i]), T.remove.folderName);
+    const { mode, folder } = android ? { mode: 'trash' as const, folder: '' } : removeSettings;
+    const folders = android ? [] : removeFolders(removeSettings, usedRanks(targets).map((i) => roots[i]), T.remove.folderName);
     const r: Report = { fn, mode, folders, done: 0, bytes: 0, exact: 0, moves: [], failedTrash: 0, failedMissing: 0, failedOther: 0 };
     const removed: string[] = [];
+    let cancelled = false;
     setWorking({ done: 0, total: targets.length });
     try {
-      for (let i = 0; i < targets.length; i += REMOVE_BATCH) {
-        const batch = targets.slice(i, i + REMOVE_BATCH);
-        const outcomes = await desktop.remove({ roots, paths: batch.map((p) => p.path), mode, folder, folderName: T.remove.folderName });
+      for (let i = 0; i < targets.length && !cancelled; i += remover.batch) {
+        const batch = targets.slice(i, i + remover.batch);
+        const outcomes = await remover.remove({ roots, paths: batch.map((p) => p.path), mode, folder, folderName: T.remove.folderName });
         for (const o of outcomes) {
           const p = byPath.get(o.path)!;
           if (o.ok) {
@@ -301,13 +301,14 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
             if (exactKeys.has(p.key)) r.exact++;
             removed.push(p.key);
             if (o.movedTo) r.moves.push({ key: p.key, size: p.size, exact: exactKeys.has(p.key), from: o.movedTo, to: o.path });
-          } else if (o.error === 'trash') r.failedTrash++;
+          } else if (o.error === 'cancelled') cancelled = true;
+          else if (o.error === 'trash') r.failedTrash++;
           else if (o.error === 'missing') {
             r.failedMissing++;
             removed.push(p.key); // Plus là : il ne doit plus apparaître.
           } else r.failedOther++;
         }
-        setWorking({ done: Math.min(i + REMOVE_BATCH, targets.length), total: targets.length });
+        setWorking({ done: Math.min(i + remover.batch, targets.length), total: targets.length });
       }
     } finally {
       setGone((g) => new Set([...g, ...removed]));
@@ -315,23 +316,29 @@ export function Results({ result, onRescan, onFolders, names, roots }: Props) {
       dropMarks('junk', removed);
       if (r.done) countRemoved(fn, r.done, r.bytes, r.exact, 1);
       setWorking(null);
-      setRemoving(null);
-      setReport(r);
-      window.scrollTo(0, 0);
+      // Refusé dans la fenêtre d'Android, rien n'a bougé : on reste devant le récapitulatif.
+      if (!cancelled || r.done || removed.length) {
+        setRemoving(null);
+        setReport(r);
+        window.scrollTo(0, 0);
+      }
     }
   };
 
   const undo = async () => {
-    if (!desktop || !report) return;
-    const outcomes = await desktop.restore(report.moves.map(({ from, to }) => ({ from, to })));
-    const back = report.moves.filter((m) => outcomes.some((o) => o.ok && o.path === m.to));
+    if (!remover || !report) return;
+    const outcomes = await remover.restore(report.moves.map(({ from, to }) => ({ from, to })));
+    const ok = new Set(outcomes.filter((o) => o.ok).map((o) => o.path));
+    const back = report.moves.filter((m) => ok.has(m.to));
+    // Refusé dans la fenêtre d'Android : « Annuler » reste proposé.
+    if (!back.length && outcomes.some((o) => o.error === 'cancelled')) return;
     const keys = new Set(back.map((m) => m.key));
     setGone((g) => new Set([...g].filter((k) => !keys.has(k))));
     if (back.length) {
       const size = back.reduce((s, m) => s + m.size, 0);
       countRemoved(report.fn, back.length, size, back.filter((m) => m.exact).length, -1);
     }
-    setReport({ ...report, moves: [], undone: back.length });
+    setReport({ ...report, moves: android ? report.moves.filter((m) => !ok.has(m.to)) : [], undone: (report.undone ?? 0) + back.length });
   };
 
   const skipped = result.unreadable + result.unsupported + result.videos;
@@ -437,7 +444,7 @@ function RemoveReport({ report, onUndo, onClose }: { report: Report; onUndo: () 
     <div className="report" role="status" data-testid="remove-report">
       {report.done > 0 && (
         <p>
-          <strong>{T.remove.done(report.done, bytes(report.bytes))}</strong> {report.mode === 'trash' ? T.remove.doneTrash : report.folders.length > 1 ? T.remove.doneFolders(T.remove.folderName) : T.remove.doneFolder(report.folders[0])}
+          <strong>{T.remove.done(report.done, bytes(report.bytes))}</strong> {android ? T.android.doneTrash : report.mode === 'trash' ? T.remove.doneTrash : report.folders.length > 1 ? T.remove.doneFolders(T.remove.folderName) : T.remove.doneFolder(report.folders[0])}
         </p>
       )}
       {report.failedTrash > 0 && <p className="warning">{T.remove.failedTrash(report.failedTrash)}</p>}

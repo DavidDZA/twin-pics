@@ -26,6 +26,7 @@ import { DEVICE_KEY, embedId } from './model';
 import { clipId } from './junk';
 import { QUALITY_VERSION } from './quality';
 import { Limiter, WorkerPool } from './pool';
+import { android } from '../platform/android';
 
 /**
  * `model` : téléchargement des modèles ; `loading` : leur préparation (déjà sur l'appareil) ; `similar` : passage des
@@ -79,10 +80,14 @@ function abortError(): DOMException {
   return new DOMException('Analyse arrêtée', 'AbortError');
 }
 
-/** Nombre de workers d'analyse : les cœurs du processeur, moins un pour l'interface (6 au plus). */
+/**
+ * Nombre de workers d'analyse : les cœurs du processeur, moins un pour l'interface (6 au plus ; 3 au plus sur un
+ * téléphone, où une photo de 50 Mpx décodée occupe 200 Mo, 2 s'il a 4 Go de mémoire ou moins).
+ */
 function poolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4;
-  return Math.max(1, Math.min(6, cores - 1));
+  const memory = (navigator as { deviceMemory?: number }).deviceMemory ?? 8;
+  return Math.max(1, Math.min(android ? (memory > 4 ? 3 : 2) : 6, cores - 1));
 }
 
 function forcedDevice(): 'auto' | 'wasm' {
@@ -173,7 +178,8 @@ async function loadModel(make: () => Worker, idOf: (dtype: string) => string, on
     });
   const first = await start(forcedDevice());
   const workers = [first.worker];
-  if (first.device === 'wasm') {
+  // Pas de second worker sur un téléphone : chacun garde tout le modèle en mémoire.
+  if (first.device === 'wasm' && !android) {
     try {
       workers.push((await start('wasm')).worker);
     } catch {
@@ -327,14 +333,20 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
       todo.map((row) =>
         inFlight.run(async () => {
           if (signal.aborted) throw abortError();
-          const buffer = await read(row);
+          const buffer = await read(row).catch(() => null);
+          if (!buffer) {
+            // Photo disparue entre la liste et la lecture (galerie pas à jour) : comptée illisible, rien en base.
+            row.error = 'read';
+            onProgress({ phase: 'analyze', done: ++analyzed, total: todo.length });
+            return;
+          }
           const res = await analyzers.call({ id: 0, buffer, mode: 'full', needSha: needSha(row), wantPixels: wantPixels(row) }, [buffer]);
           const { thumb, pixels, id: _id, ok, ...fields } = res;
           Object.assign(row, fields, { error: ok ? undefined : res.error, qv: QUALITY_VERSION });
           pendingRows.push(row);
           if (thumb) pendingThumbs.push({ key: row.key, blob: thumb });
           analyzed++;
-          if (analyzed % SAVE_EVERY === 0) writes.push(flush());
+          if (pendingRows.length >= SAVE_EVERY) writes.push(flush());
           onProgress({ phase: 'analyze', done: analyzed, total: todo.length });
           if (pixels) await toModels(row, pixels, shotTime(row) !== undefined, true);
         }),
@@ -361,7 +373,8 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
         missing.map((row) =>
           inFlight.run(async () => {
             if (signal.aborted) throw abortError();
-            const buffer = await read(row);
+            const buffer = await read(row).catch(() => null);
+            if (!buffer) return;
             const res = await analyzers.call({ id: 0, buffer, mode: 'pixels', needSha: false, wantPixels: 'all' }, [buffer]);
             if (res.pixels) await toModels(row, res.pixels, dinoMissing.has(row.key), clipMissing.has(row.key));
           }),
@@ -385,7 +398,7 @@ export async function scan(listing: Listing, opts: ScanOptions): Promise<ScanRes
   // Paires candidates.
   const dinoId = dino ? dino.model?.id : opts.similar ? known.dino?.id : undefined;
   const clipModelId = clip ? clip.model?.id : opts.junkModel ? known.clip?.id : undefined;
-  const photos = [...rows.values()].filter((r) => !r.error || r.sha).map((r) => toInfo(r, dinoId, clipModelId, entries.get(r.key)?.rank));
+  const photos = [...rows.values()].filter((r) => r.error !== 'read' && (!r.error || r.sha)).map((r) => toInfo(r, dinoId, clipModelId, entries.get(r.key)?.rank));
   onProgress({ phase: 'pairs', done: 0, total: photos.length });
   const pairs = await computePairs(photos, signal);
 

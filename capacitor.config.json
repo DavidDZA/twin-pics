@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.daviddza.twinpics",
+  "appName": "Twin Pics",
+  "webDir": "dist",
+  "android": {
+    "minWebViewVersion": 111
+  }
+}

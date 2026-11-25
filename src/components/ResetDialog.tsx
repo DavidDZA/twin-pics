@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { T } from '../i18n';
+import { useBack } from '../lib/back';
 
 interface Props {
   /** Les choix d'une fonction, ou des deux. */
@@ -19,6 +20,8 @@ export function ResetDialog({ title, sorted, ignored, onCancel, onConfirm }: Pro
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
+
+  useBack(onCancel);
 
   return createPortal(
     <div className="modal-back" onClick={(e) => e.target === e.currentTarget && onCancel()}>

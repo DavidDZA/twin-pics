@@ -33,14 +33,14 @@ export interface RemoveRequest {
 
 /**
  * Le sort d'une photo. `error` : `trash` (pas de Corbeille sur ce disque, une clé USB par exemple : la photo n'est
- * pas touchée), `missing` (le fichier n'est plus là), `other`.
+ * pas touchée), `missing` (le fichier n'est plus là), `cancelled` (Android : refusé par l'utilisateur), `other`.
  */
 export interface RemoveOutcome {
   path: string;
   ok: boolean;
   /** Mode `folder` : où la photo a été déplacée. */
   movedTo?: string;
-  error?: 'trash' | 'missing' | 'other';
+  error?: 'trash' | 'missing' | 'cancelled' | 'other';
   message?: string;
 }
 
@@ -81,8 +81,34 @@ export function photoUrl(path: string): string {
   return PHOTO_URL + encodeURIComponent(path);
 }
 
+/** Une photo de la galerie du téléphone : son numéro, son chemin (« DCIM/Camera/IMG_1.jpg »). */
+export interface GalleryPhoto {
+  id: number;
+  path: string;
+  size: number;
+  lastModified: number;
+}
+
+/** Accès à la galerie : toutes les photos, celles choisies par l'utilisateur (Android 14 et plus), aucune. */
+export type GalleryAccess = 'all' | 'some' | 'none';
+
+/** Ce que l'appli Android donne à l'interface (`android.ts`). */
+export interface AndroidApi {
+  access(): Promise<GalleryAccess>;
+  /** Android demande l'autorisation (plus après deux refus : `openSettings`). */
+  requestAccess(): Promise<GalleryAccess>;
+  list(): Promise<GalleryPhoto[]>;
+  /** Corbeille du téléphone (`trashed`) ou retour à leur place ; Android demande confirmation. */
+  trash(ids: number[], trashed: boolean): Promise<{ cancelled: boolean; missing: number[] }>;
+  /** Garde l'écran allumé. */
+  keepAwake(on: boolean): void;
+  openSettings(): void;
+}
+
 declare global {
   interface Window {
     twinPics?: DesktopApi;
+    /** Fausse galerie des tests. */
+    twinPicsAndroid?: AndroidApi;
   }
 }

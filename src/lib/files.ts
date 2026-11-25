@@ -3,7 +3,8 @@
  * - **site web** : File System Access API (Chrome, Edge sur PC ; le dossier peut être repris au lancement suivant),
  *   sinon champ d'envoi de dossier (`webkitdirectory`), en lecture seule (`platform/web.ts`) ;
  * - **appli PC** : le processus principal d'Electron liste le dossier, la page lit chaque photo par l'adresse
- *   `app://twin-pics/_photo/…` (`platform/desktop.ts`).
+ *   `app://twin-pics/_photo/…` (`platform/index.ts`) ;
+ * - **appli Android** : la galerie du téléphone (`platform/android.ts`).
  */
 import { fileType, isSkippedDir } from './filetypes';
 

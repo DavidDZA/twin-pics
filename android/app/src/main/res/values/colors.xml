@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond de la page (src/styles.css) -->
+    <color name="window">#F6F7FB</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

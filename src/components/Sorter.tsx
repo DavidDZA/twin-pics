@@ -39,6 +39,7 @@ import { likenessText, photoDetails, reasonsText } from './photoText';
 import { addStats, countSwipe } from '../lib/statsStore';
 import { useThumbs } from './useThumbs';
 import { SwipeSorter, swipeQueue } from './SwipeSorter';
+import { useBack } from '../lib/back';
 import { useView, VIEWS, type SortView } from './useView';
 import { Viewer } from './Viewer';
 
@@ -99,6 +100,8 @@ export function Sorter({ groups, start, review, photos, files, marks, pending, o
     setIgnored((s) => new Set(s).add(group.id));
     setIndex(nextUnsorted(index + 1, group.id));
   };
+
+  useBack(onClose);
 
   const group = groups[index] as Group | undefined;
   const unsortedLeft = groups.filter((g) => !ignored.has(g.id) && !isSorted(g, photos, marks)).length;
