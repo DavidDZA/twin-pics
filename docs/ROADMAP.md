@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 25/11/2026 (version 0.12). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 25/11/2026 (version 0.12.1). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -61,7 +61,7 @@
 > (24/11) **Version 0.11** : date lue dans le **nom du fichier** quand la photo n'a pas de date EXIF (ARCHITECTURE § 3).
 >
 > (25/11) **Version 0.12, première appli Android** (ARCHITECTURE § 2.3), feu vert de l'utilisateur : galerie, dossiers à cocher,
-> corbeille du téléphone, bouton Retour, paysage ; essayée sur un téléphone simulé à chaque push.
+> corbeille du téléphone, bouton Retour, paysage ; essayée sur un téléphone simulé à chaque push. 0.12.1 : pied de page du site, qui débordait au téléphone.
 >
 > **Reprendre ici** :
 >

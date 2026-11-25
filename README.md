@@ -4,7 +4,7 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.12, 25/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
+**État : appli PC** (version 0.12.1, 25/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
 **photos inutiles** (floues, ratées, captures d'écran, documents…) d'un ou plusieurs dossiers. Elle les fait trier (garder une photo,
 plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le site web reste là pour essayer (il
 trouve et trie, il ne supprime pas). L'**appli Android** est en essai (pas encore sur le Play Store) : la galerie du téléphone,
@@ -29,7 +29,7 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin.Pics.0.12.0.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.12.1.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest). Rien à installer : la première ouverture se
    décompresse (une barre, 10 à 35 s), les suivantes sont immédiates (l'appli reste dans
    `%LOCALAPPDATA%\Twin Pics Portable`). Windows peut afficher « Windows a protégé votre ordinateur » (appli non

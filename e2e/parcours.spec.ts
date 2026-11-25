@@ -353,6 +353,18 @@ test('miniatures affichées, aucune barre de défilement horizontale', async ({ 
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
+test('pied de page : rien ne déborde, dans les 6 langues', async ({ page }) => {
+  await page.goto('/');
+  for (const lang of ['fr', 'en', 'es', 'de', 'it', 'pt']) {
+    await page.evaluate((l) => localStorage.setItem('app-lang', l), lang);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', lang);
+    await expect(page.locator('.bottom .links a')).toHaveCount(3);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, lang).toBeLessThanOrEqual(0);
+  }
+});
+
 test('langue : en anglais, toute l’interface suit', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Langue' }).selectOption('en');

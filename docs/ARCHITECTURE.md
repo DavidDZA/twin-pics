@@ -550,7 +550,7 @@ durées par `Intl` (`bytes`, `duration`).
   réduite, rafale floue, photo cassée, HEIC, vidéo), lu par le champ `webkitdirectory` (la fenêtre de choix de dossier
   ne s'automatise pas). Parcours : écran de départ, groupes trouvés et suggestions, photos non analysées, curseurs,
   barre du haut sans page intermédiaire, « Pas des doublons » (annuler, retenu, remettre), seconde analyse sans rien refaire, visionneuse (zoom à la
-  molette, au clavier, au double clic, à deux doigts, gardé d'une photo à l'autre), stats et badges (badge gagné et daté), un clic d'une fonction à l'autre (retenue), plusieurs dossiers (liste, ordre à la poignée et au clavier, doublons d'un dossier à l'autre, retrait), barre d'ouverture, miniatures, pas de défilement horizontal,
+  molette, au clavier, au double clic, à deux doigts, gardé d'une photo à l'autre), stats et badges (badge gagné et daté), un clic d'une fonction à l'autre (retenue), plusieurs dossiers (liste, ordre à la poignée et au clavier, doublons d'un dossier à l'autre, retrait), barre d'ouverture, miniatures, pas de défilement horizontal (dont le pied de page, dans les 6 langues),
   anglais. Avec `E2E_MODELE=1` (télécharge le modèle) : rafale trouvée pendant l'analyse, la plus nette proposée, et
 où a tourné le modèle affiché ; même chose sur le processeur forcé ; photos similaires demandées après une analyse
 sans elles (photos déjà vues complétées).
