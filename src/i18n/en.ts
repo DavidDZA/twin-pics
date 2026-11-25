@@ -361,4 +361,5 @@ export const en: Dict = {
     doneTrash: 'They are in the phone’s trash for 30 days; the space is freed after that, or when you empty it.',
   },
   language: 'Language',
+  privacy: 'Privacy',
 };

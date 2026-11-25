@@ -365,6 +365,7 @@ export const fr = {
     doneTrash: 'Elles sont dans la corbeille du téléphone pendant 30 jours ; la place est libérée ensuite, ou quand tu la vides.',
   },
   language: 'Langue',
+  privacy: 'Confidentialité',
 };
 
 export type Dict = typeof fr;

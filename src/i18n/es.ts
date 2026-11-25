@@ -364,4 +364,5 @@ export const es: Dict = {
     doneTrash: 'Están en la papelera del teléfono durante 30 días; el espacio se libera después, o cuando la vacíes.',
   },
   language: 'Idioma',
+  privacy: 'Privacidad',
 };

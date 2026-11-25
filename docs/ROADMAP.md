@@ -1,6 +1,6 @@
 # Feuille de route — ce qui reste à faire
 
-> État au 24/11/2026 (version 0.11). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
+> État au 25/11/2026 (version 0.12). Comment l'appli marche : [ARCHITECTURE.md](ARCHITECTURE.md). Réflexions de départ :
 > `DavidDZA\IDEES-APPLIS.md`, idée 1.
 >
 > Fait (20/11) : **prototype PC** — dossier choisi dans Chrome / Edge, copies exactes, quasi identiques et similaires
@@ -60,17 +60,21 @@
 >
 > (24/11) **Version 0.11** : date lue dans le **nom du fichier** quand la photo n'a pas de date EXIF (ARCHITECTURE § 3).
 >
-> **Reprendre ici** (projet en pause depuis le 24/11/2026, à la demande de l'utilisateur ; rien en cours, la 0.11 est publiée) :
+> (25/11) **Version 0.12, première appli Android** (ARCHITECTURE § 2.3), feu vert de l'utilisateur : galerie, dossiers à cocher,
+> corbeille du téléphone, bouton Retour, paysage ; essayée sur un téléphone simulé à chaque push.
+>
+> **Reprendre ici** :
+>
+> 0. **Android, par l'utilisateur** : secrets de signature, appli dans la Play Console, test interne, premier essai et mesures
+>    ([ANDROID.md](ANDROID.md)). Ensuite, selon les mesures : § 5, point 3.
 >
 > 1. **Par l'utilisateur** : un vrai ménage de ses photos avec la 0.11 (seule l'utilisation montrera les manques). À
 >    regarder : le clic de plus (« Analyser »), l'ordre des dossiers (poignée ⠿), l'avertissement pour une sauvegarde, les
 >    groupes mis de côté tout seuls, les rafales, les dates lues dans les noms.
-> 2. **Version 0.12 proposée** (pas encore décidée) : **annonce des nouvelles versions** et **astuces de première visite**
+> 2. **Proposé** (pas encore décidé) : **annonce des nouvelles versions** et **astuces de première visite**
 >    (§ 3), les deux manques les plus gênants pour une appli publique.
 > 3. **Autres petits plus sur PC**, au choix : dossier « sauvegarde » comparé mais jamais supprimé (§ 3), vidéos en double
 >    (§ 6.1 ; plus long), HEIC s'il en a (§ 3), « ces deux photos sont des doublons » avec un export pour régler les seuils (§ 2).
-> 4. **Appli Android** (§ 5, point 3) : **rien commencer sans son feu vert**. À vérifier en premier : WebGPU dans la WebView,
->    mémoire avec 10 000 photos, vitesse sur téléphone.
 
 ## 1. Décisions prises (20/11/2026)
 
@@ -97,7 +101,7 @@
 - **WhatsApp seulement sur Android** (pas sous Windows, où les images n'indiquent pas leur conversation).
 - **Deux fonctions séparées** : doublons, photos inutiles ; une seule page, un clic pour passer de l'une à l'autre.
 - **Plus d'installateur** : seulement l'exe portable.
-- Android : ne rien commencer pour l'instant.
+- ~~Android : ne rien commencer pour l'instant~~ — feu vert le 25/11/2026.
 
 ## 2. Mesurer la détection sur les vraies photos
 
@@ -152,20 +156,14 @@ scène à quelques minutes, copies retouchées).
    publique ; jusqu'à 100 testeurs déclarés sans.
 2. **Google Photos** : l'API ne donne plus la bibliothèque depuis le 31/03/2025 ; passer par les copies du téléphone,
    ou un export **Google Takeout** sur le PC (que le prototype sait déjà lire comme un dossier).
-3. **Android** (décidé le 22/11 : **Capacitor** ; rien à commencer avant le feu vert de l'utilisateur) : la même interface (React) dans une WebView, avec un module natif
-   (Kotlin) pour la galerie :
-   - liste des photos par **MediaStore** (`READ_MEDIA_IMAGES`, Android 13+ ; accès partiel « photos choisies » à
-     gérer), lecture des fichiers par un chemin servi à la WebView (comme `app://` sur PC) ;
-   - suppression par la **corbeille système** (`MediaStore.createTrashRequest`, Android 11+ : une seule
-     confirmation d'Android pour tout le lot, récupérable 30 jours dans Google Photos / la galerie) ;
-   - nouvelle plateforme dans `src/platform/` (à côté de `desktop`) ; duels par défaut ; paysage déjà prêt (§ 4.1
-     d'ARCHITECTURE) ;
-   - à vérifier tôt : WebGPU dans la WebView Android (sinon modèle sur le processeur, plus lent), mémoire avec
-     10 000 photos, vitesse de décodage sur téléphone ;
-   - publication : le téléphone de l'utilisateur est professionnel (pas d'APK hors magasin) → test interne de la Play
-     Console dès les premiers essais (comme Rank It All), déclaration de la permission photos (fonction principale :
-     autorisée), test fermé de 14 jours avant la production. Compilation par GitHub Actions (rien à installer sur le
-     PC), comme l'AAB de Rank It All.
+3. **Android** : ~~galerie, corbeille du système, duels par défaut, paysage~~ — fait le 25/11 (0.12, ARCHITECTURE § 2.3).
+   Restent, après le premier essai :
+   - **mesures** sur un vrai téléphone : durée, mémoire avec 10 000 photos, carte graphique ou processeur ;
+   - si les modèles sont trop lents : moteur natif (ONNX Runtime pour Android, plusieurs fils d'exécution), hors de la WebView ;
+   - analyse **écran éteint** (service au premier plan) si elle dure trop longtemps ;
+   - décodage à taille réduite par Android (`ImageDecoder`) : plus rapide, et lit le **HEIC** ;
+   - vidéos en double (§ 6.1), WhatsApp par conversation (§ 6.1) ;
+   - publication : fiche du Store (textes, captures), déclaration de la permission photos, test fermé de 14 jours.
 
 ## 6. Plus tard
 

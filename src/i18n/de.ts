@@ -361,4 +361,5 @@ export const de: Dict = {
     doneTrash: 'Sie liegen 30 Tage lang im Papierkorb des Handys; der Platz wird danach frei, oder wenn du ihn leerst.',
   },
   language: 'Sprache',
+  privacy: 'Datenschutz',
 };

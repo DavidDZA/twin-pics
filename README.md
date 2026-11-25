@@ -4,10 +4,11 @@ Retrouver les photos en double et garder la meilleure. Tout se passe **sur l'app
 envoyée sur un serveur. Gratuit, sans publicité, open source. En 6 langues (français, anglais, espagnol, allemand,
 italien, portugais du Brésil), selon l'appareil ou au choix.
 
-**État : appli PC** (version 0.11, 24/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
+**État : appli PC** (version 0.12, 25/11/2026) : une appli Windows avec deux fonctions séparées, les **doublons** et les
 **photos inutiles** (floues, ratées, captures d'écran, documents…) d'un ou plusieurs dossiers. Elle les fait trier (garder une photo,
 plusieurs ou aucune) et supprime ce qui doit l'être, après un récapitulatif. Le site web reste là pour essayer (il
-trouve et trie, il ne supprime pas). L'appli Android viendra ensuite. Pas de version Mac ni iPhone.
+trouve et trie, il ne supprime pas). L'**appli Android** est en essai (pas encore sur le Play Store) : la galerie du téléphone,
+les mêmes fonctions, suppression dans la corbeille du téléphone. Pas de version Mac ni iPhone.
 
 ## Ce qu'il trouve
 
@@ -28,7 +29,7 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
 
 ## Utilisation
 
-1. **Appli PC** : télécharger `Twin.Pics.0.11.0.exe` dans les
+1. **Appli PC** : télécharger `Twin.Pics.0.12.0.exe` dans les
    [*Releases*](https://github.com/DavidDZA/twin-pics/releases/latest). Rien à installer : la première ouverture se
    décompresse (une barre, 10 à 35 s), les suivantes sont immédiates (l'appli reste dans
    `%LOCALAPPDATA%\Twin Pics Portable`). Windows peut afficher « Windows a protégé votre ordinateur » (appli non
@@ -67,6 +68,14 @@ proposé ; il reste dans « Groupes mis de côté », d'où on peut le remettre.
    l'appli ne touche à rien et le dit.
 6. **Stats et badges** (en haut) : photos analysées, triées, supprimées, place libérée, et cinquante badges.
 
+### Sur Android
+
+Android 11 ou plus. « Autoriser l'accès à mes photos », choisir les dossiers de la galerie (tous au départ), « Analyser ».
+Le tri se fait en duels et en swipe (la grille reste possible), en portrait ou en paysage. Les photos supprimées vont dans la
+**corbeille du téléphone** (30 jours), après la confirmation d'Android. L'écran reste allumé pendant l'analyse. Les photos
+similaires et les documents sont décochés au départ : plus longs, et un modèle à télécharger. Mise en route :
+[docs/ANDROID.md](docs/ANDROID.md).
+
 ## Développement
 
 ```sh
@@ -80,8 +89,10 @@ npm test         # tests automatiques (Vitest), aussi lancés avant chaque dépl
 npm run e2e      # tests de bout en bout du site (Playwright, Chrome installé, formats téléphone et PC)
 npm run e2e:pc   # tests de bout en bout de l'appli PC (vraie appli Electron)
 npm run e2e:exe  # les mêmes, sur l'exe construit par npm run dist
+npm run android  # construire le site et le copier dans le projet Android (android/) ; compilé par GitHub Actions
+npm run e2e:android  # l'appli Android sur un téléphone simulé (lancé par GitHub Actions ; il faut adb)
 E2E_MODELE=1 npm run e2e   # avec les tests des photos similaires (télécharge le modèle) ; marche aussi avec e2e:pc
-npm run icon     # refaire l'icône de l'exe (build/) depuis public/favicon.svg
+npm run icon     # refaire l'icône de l'exe (build/) depuis public/favicon.svg ; icon:android : celle d'Android
 node tools/vitesse/mesure.mjs [dossier]   # banc de mesure de vitesse (décodage, modèle processeur / carte graphique)
 node tools/inutiles/calibrer.mjs --phrases          # vecteurs des phrases de MobileCLIP → src/lib/junkPrompts.json
 node tools/inutiles/calibrer.mjs [dossier] [nombre] # photos inutiles trouvées dans un dossier (seuils), test-results/
@@ -90,7 +101,7 @@ node tools/doublons/empreintes.mjs [dossier]        # paires quasi identiques, r
 ```
 
 Stack : Vite, React, TypeScript, Dexie (IndexedDB), exifr, Transformers.js (ONNX Runtime Web), Electron et
-electron-builder (appli PC), Vitest, Playwright. Toutes les dépendances sont des `devDependencies` : l'interface est
+electron-builder (appli PC), Capacitor (appli Android), Vitest, Playwright. Toutes les dépendances sont des `devDependencies` : l'interface est
 empaquetée par Vite, l'exe n'embarque aucun `node_modules`.
 
 Fonctionnement détaillé : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Suite du projet : [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -103,6 +114,9 @@ Fonctionnement détaillé : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Suite 
   teste, construit l'exe portable sous Windows, l'ouvre pour l'essayer et crée la release `vX.Y.Z` (Actions → Appli PC → Run workflow pour la
   reconstruire). Chaque nouvelle version est aussi construite en local (`npm run dist` → `release/`), puis vérifiée
   par `npm run e2e:exe`.
+
+- **Appli Android** : `.github/workflows/android.yml` compile, essaie l'appli sur un téléphone simulé et, sur `main`, signe
+  `twin-pics.aab` pour la Play Console (secrets `ANDROID_KEYSTORE_*`, [docs/ANDROID.md](docs/ANDROID.md)).
 
 ## Licence
 

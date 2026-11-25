@@ -1,6 +1,6 @@
 # Architecture — comment marche Twin Pics
 
-> **À lire en premier par toute nouvelle session de travail.** État au 24/11/2026 (version 0.11 : **doublons et photos inutiles
+> **À lire en premier par toute nouvelle session de travail.** État au 25/11/2026 (version 0.12 : première **appli Android**, § 2.3 ; **doublons et photos inutiles
 > séparés**, § 1 ; appli PC, § 2.1 ; habillage, § 2.2 ; tri et suppression, § 4 ; photos inutiles, § 4.3 ; groupes mis
 > de côté et effacement des choix, § 4.4 ; zoom, § 4.5 ; stats et badges, § 4.6). Ce qui reste à faire est dans
 > [ROADMAP.md](ROADMAP.md). L'histoire du projet (pourquoi cette appli, sources des photos,
@@ -14,10 +14,10 @@ lues et analysées sur place ; seul le modèle des photos similaires est téléc
 
 Une seule interface (React), sous trois formes (`src/platform/`) :
 
-- **Appli PC** (Windows, exe portable, Electron, § 2.1) : la vraie appli. Elle seule supprime des photos.
+- **Appli PC** (Windows, exe portable, Electron, § 2.1).
 - **Site** (GitHub Pages, Chrome ou Edge) : pour essayer. Il trouve et trie ; la fenêtre « Avant de supprimer » y
   explique que la suppression se fait dans l'appli PC (lien vers les *Releases*).
-- **Android** (Capacitor) : à venir (ROADMAP § 5).
+- **Appli Android** (Capacitor, § 2.3) : la galerie du téléphone à la place des dossiers.
 
 Pas de version Mac ni iPhone (décision du 23/11/2026).
 
@@ -41,6 +41,8 @@ Trois écrans (`App.tsx`), et le bouton « Stats et badges » en haut :
   l'utilisateur.
   **Rien n'est partagé entre les deux** : choix (`marks`, `junkMarks`), groupes mis de côté, suppression. Une photo
   inutile qui a aussi un double apparaît dans les deux ; supprimée d'un côté, elle disparaît de l'autre.
+- **Android** : même page de départ, avec la galerie (`GalleryPicker`, `useGallery`) à la place de la liste des
+  dossiers, § 2.3.
 - Par-dessus : l'**écran de tri** (`Sorter`, plein écran), la **visionneuse** (`Viewer`, § 4.5), les fenêtres **« Avant de
   supprimer »** (`RemoveDialog`), « Effacer mes choix » (`ResetDialog`, une fonction ou les deux), « Stats et badges » (`StatsDialog`), et les petits
   messages (`Toasts`, `notify.ts` : badge gagné, groupe mis de côté avec « Annuler »).
@@ -92,7 +94,7 @@ electron/            appli PC (processus principal, Node) : construit en dist-el
   list.ts              liste des dossiers ; remove.ts : Corbeille, dossier « À supprimer », annulation ; paths.ts
 src/
   App.tsx            les trois écrans, lancement de l'analyse
-  platform/          site ou appli PC : index.ts (desktop, liste, réglages de suppression), bridge.ts (window.twinPics)
+  platform/          site, appli PC ou Android : index.ts (desktop, remover, réglages de suppression), bridge.ts (types), android.ts (galerie)
   lib/
     files.ts           une photo trouvée (FoundFile), lecture du dossier sur le site
     filetypes.ts       types de fichiers, dossiers ignorés (partagé avec electron/)
@@ -103,6 +105,7 @@ src/
     quality.ts         netteté de la zone la plus nette, luminosité, contraste (code pur)
     junk.ts            photos inutiles : raisons, scores MobileCLIP, groupes (code pur) ; junkPrompts.json
     clip.worker.ts     MobileCLIP (vecteur de 512 nombres par photo)
+    albums.ts          dossiers de la galerie du téléphone (code pur) ; back.ts : bouton Retour d'Android
     folders.ts         liste des dossiers (ajout, ordre, noms), § 1.1 ; components/FolderList : la poignée ⠿
     nameDate.ts        date de prise de vue lue dans le nom du fichier (code pur), § 3
     display.ts         chemins affichés à partir du dossier analysé
@@ -116,7 +119,8 @@ src/
     db.ts model.ts messages.ts
   components/        écrans et briques (Results, Space, GroupCard, Sorter, SwipeSorter, RemoveDialog, Viewer, StatsDialog…)
   i18n/              un dictionnaire par langue (fr.ts en référence)
-tests/  e2e/  e2e-pc/  Vitest, Playwright site, Playwright appli PC (e2e/photos.ts génère le dossier d'essai)
+android/             appli Android (Capacitor) : Gallery.java (MediaStore), GalleryPlugin.java, MainActivity.java
+tests/  e2e/  e2e-pc/  e2e-android/  Vitest, Playwright site, appli PC, téléphone simulé (e2e/photos.ts : dossier d'essai)
 scripts/             construction et lancement de l'appli PC, icône (build/icon.ico, depuis public/favicon.svg)
 tools/vitesse/       banc de mesure de vitesse (décodage, modèle sur processeur ou carte graphique), § 3.5
 tools/inutiles/      phrases de MobileCLIP et calibrage des photos inutiles sur un dossier, § 4.3
@@ -168,6 +172,40 @@ douces avec ombre ; un emoji décoratif par case de chiffres (👯 🗂️ 💾,
 **logo animé** (`TwinCards` : deux photos jumelles qui se rejoignent au départ, se mélangent pendant l'analyse) ;
 barre de progression du tri ; « VS » entre les deux photos d'un duel ; 🎉 à la fin du tri et après une suppression.
 Toutes les animations s'arrêtent si le système demande moins de mouvement (`prefers-reduced-motion`).
+
+### 2.3 Appli Android (Capacitor, 0.12, 25/11/2026)
+
+Feu vert de l'utilisateur le 25/11. Même interface, emballée par **Capacitor 8** (`capacitor.config.json`, `android/`) : le
+site construit (`dist/`) dans une WebView, et un module natif **Java** (le modèle de projet de Capacitor l'est ; pas de
+Kotlin à ajouter). Mise en route et premier essai : [ANDROID.md](ANDROID.md).
+
+- **Android 11 au moins** (API 30) : c'est la première version qui a la corbeille du système ; avant, une suppression
+  serait définitive. WebView 111 au moins (mise à jour par le Play Store).
+- **Galerie** (`Gallery.java`) : liste par MediaStore (mémoire du téléphone et carte SD), chemins « DCIM/Camera/… »
+  (carte SD : précédés du nom du volume). Photo lue à `https://localhost/_photo/<numéro>`, servie par
+  `MainActivity` (`shouldInterceptRequest`). `ACCESS_MEDIA_LOCATION` + `setRequireOriginal` : sans eux, Android efface le
+  lieu à la lecture, et deux fichiers différents paraîtraient identiques octet pour octet.
+- **Autorisation** : toutes les photos, ou seulement celles choisies (Android 14) ; refusée : bouton vers les réglages.
+- **Dossiers** (`albums.ts`) : tous cochés au départ ; on retient ceux **décochés** (`albums-off`), un nouveau dossier est
+  donc analysé d'office. La galerie est relue à chaque analyse et au retour dans l'appli. HEIC comptées à part.
+- **Suppression** (`remover` dans `platform/index.ts`, commun à l'appli PC) : `MediaStore.createTrashRequest`, par lots de
+  1 000 (Android demande confirmation à chaque lot) ; récupérables 30 jours. Photos disparues écartées avant (une seule
+  ferait refuser toute la demande). Refus : on reste devant le récapitulatif. « Annuler » les sort de la corbeille
+  (Android redemande).
+- **Bouton Retour** (`back.ts`) : ferme la dernière chose ouverte ; sinon l'appli passe en arrière-plan sans se fermer.
+- **Écran allumé** pendant l'analyse. Page fermée par Android faute de mémoire : rouverte (ce qui est analysé est en base).
+- **Mémoire** : 3 workers d'analyse au plus (2 si le téléphone a 4 Go ou moins ; une photo de 50 Mpx décodée = 200 Mo), un
+  seul worker par modèle sur le processeur. Les deux recherches à modèle sont **décochées au départ** (longues, gros
+  téléchargement), à revoir après les mesures.
+- **Carte graphique** : WebGPU est dans la WebView depuis sa version 146 (début 2026) ; sinon processeur. À mesurer sur un
+  vrai téléphone (celui simulé n'en dit rien).
+- **Barres d'Android** (plein écran obligatoire depuis Android 15) : marges posées par Capacitor (`SystemBars`, la page
+  n'a pas `viewport-fit=cover`). Fond de la fenêtre clair ou sombre comme la page.
+- **Pas de sauvegarde chez Google** (`allowBackup=false`) : la base contient des miniatures.
+- Version de `package.json` (0.12.0 → code 1200). Icône : `npm run icon:android`. Règles de confidentialité :
+  `public/confidentialite.html` (6 langues).
+- **Photo illisible à la lecture** (disparue entre la liste et l'analyse, sur toutes les plateformes) : comptée illisible,
+  l'analyse continue, rien n'est retenu en base (`error: 'read'`). Avant, toute l'analyse échouait.
 
 ## 3. L'analyse (`scan.ts`)
 
@@ -537,6 +575,11 @@ sans elles (photos déjà vues complétées).
   annulation, clé débranchée, dossier retenu par une version d'avant la 0.8), photos inutiles triées en swipe puis à la
   Corbeille ; avec `E2E_MODELE=1`, photos similaires
   sur la carte graphique.
+
+- **Android** : `android.test.ts` (dossiers, corbeille acceptée, refusée, en erreur, annulée par lots, bouton Retour) ;
+  `e2e/android.spec.ts` (l'interface avec une fausse galerie, `window.twinPicsAndroid`) ; `e2e-android/` : la **vraie appli
+  sur un téléphone simulé** (Android 15, dans GitHub Actions) — autorisation, analyse, paysage, corbeille d'Android,
+  annulation, bouton Retour, modèle des photos similaires. Le résultat et les erreurs sont en annotations du workflow.
 
 ## 7. Conventions
 

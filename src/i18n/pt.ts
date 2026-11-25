@@ -363,4 +363,5 @@ export const pt: Dict = {
     doneTrash: 'Elas ficam na lixeira do celular por 30 dias; o espaço é liberado depois, ou quando você a esvaziar.',
   },
   language: 'Idioma',
+  privacy: 'Privacidade',
 };

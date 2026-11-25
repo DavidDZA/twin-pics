@@ -20,6 +20,9 @@ export function Footer() {
             {T.app.getPc}
           </a>
         )}
+        <a href="https://daviddza.github.io/twin-pics/confidentialite.html" target="_blank" rel="noreferrer">
+          {T.privacy}
+        </a>
         <a href="https://github.com/DavidDZA/twin-pics" target="_blank" rel="noreferrer">
           GitHub
         </a>

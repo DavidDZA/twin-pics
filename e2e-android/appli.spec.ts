@@ -25,6 +25,11 @@ async function tapSystem(what: RegExp): Promise<void> {
     try {
       shell('uiautomator dump /sdcard/ui.xml');
       xml = shell('cat /sdcard/ui.xml');
+      // Téléphone simulé surchargé (« Pixel Launcher ne répond pas ») : on attend, la fenêtre voulue est dessous.
+      if (/aerr_wait/.test(xml) && !what.test('aerr_wait')) {
+        await tapSystem(/aerr_wait/);
+        continue;
+      }
       for (const node of xml.match(/<node [^>]*>/g) ?? []) {
         const get = (k: string) => new RegExp(`${k}="([^"]*)"`).exec(node)?.[1] ?? '';
         if (!what.test(get('text')) && !what.test(get('resource-id'))) continue;
@@ -54,17 +59,39 @@ const galleryCount = () => (shell('content query --uri content://media/external/
 
 let device: AndroidDevice;
 
+/** Une attente sans limite de Playwright : limitée, et nommée si elle échoue. */
+function within<T>(ms: number, name: string, p: Promise<T>): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`trop long : ${name}`)), ms);
+  });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
+
 async function open(): Promise<Page> {
   shell(`am force-stop ${PKG}`);
+  // La page de l'ancien processus doit avoir disparu, sinon on s'y connecterait.
+  for (let i = 0; i < 20 && device.webViews().some((w) => w.pkg() === PKG); i++) await sleep(500);
   shell(`am start -W -n ${PKG}/.MainActivity`);
-  const page = await (await device.webView({ pkg: PKG }, { timeout: 60_000 })).page();
+  const view = await device.webView({ pkg: PKG }, { timeout: 60_000 });
+  const page = await within(60_000, 'connexion à la page', view.page());
   page.setDefaultTimeout(30_000);
   return page;
+}
+
+/** Recharge la page, en français (choix retenu, comme par l'utilisateur), avec d'autres réglages au besoin. */
+async function inFrench(page: Page, settings: Record<string, string> = {}): Promise<void> {
+  await page.evaluate((s) => {
+    for (const [k, v] of Object.entries(s)) localStorage.setItem(k, v);
+    location.reload();
+  }, { 'app-lang': 'fr', ...settings });
+  await expect(page.getByRole('button', { name: /^Analyser \d+ photos$/ })).toBeVisible({ timeout: 30_000 });
 }
 
 test.beforeAll(async () => {
   [device] = await _android.devices();
   expect(device, 'aucun appareil').toBeTruthy();
+  shell('settings put global hide_error_dialogs 1');
   shell('settings put system accelerometer_rotation 0');
   shell('rm -rf /sdcard/DCIM /sdcard/Pictures/Mes');
   shell('mkdir -p /sdcard/DCIM');
@@ -96,16 +123,14 @@ test.afterAll(async () => {
 
 test('autorisation, analyse, corbeille du téléphone, bouton Retour, rotation', async () => {
   const total = galleryCount();
-  let page = await open();
+  const page = await open();
   await page.getByRole('button', { name: /Autoriser l’accès|Allow access/ }).click();
   await tapSystem(/permission_allow_all_button|permission_allow_button|^Allow all$/);
   const analyze = page.getByRole('button', { name: /^(Analyser|Analyze) \d+ photos$/ });
   await expect(analyze).toBeVisible({ timeout: 30_000 });
   screenshot('android-depart.png');
 
-  // En français, pour la suite (choix retenu, comme par l'utilisateur).
-  await page.evaluate(() => localStorage.setItem('app-lang', 'fr'));
-  page = await open();
+  await inFrench(page);
   await page.getByRole('button', { name: /^Analyser \d+ photos$/ }).click();
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 120_000 });
   screenshot('android-resultats.png');
@@ -170,12 +195,8 @@ test('autorisation, analyse, corbeille du téléphone, bouton Retour, rotation',
 test('modèle des photos similaires dans la WebView', async () => {
   test.skip(!process.env.E2E_MODELE, 'télécharge le modèle : E2E_MODELE=1');
   for (const p of ['READ_MEDIA_IMAGES', 'ACCESS_MEDIA_LOCATION']) shell(`pm grant ${PKG} android.permission.${p}`);
-  let page = await open();
-  await page.evaluate(() => {
-    localStorage.setItem('app-lang', 'fr');
-    localStorage.setItem('opt-similar', 'true');
-  });
-  page = await open();
+  const page = await open();
+  await inFrench(page, { 'opt-similar': 'true' });
   await page.getByRole('button', { name: /^Analyser \d+ photos$/ }).click();
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 200_000 });
   await expect(page.getByText(/Photos similaires calculées par/)).toBeVisible();

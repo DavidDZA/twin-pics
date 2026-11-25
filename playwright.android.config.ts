@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: 'e2e-android',
-  timeout: 240_000,
+  timeout: 400_000,
   workers: 1,
   retries: 1,
   reporter: [['list'], ['github']],

@@ -363,4 +363,5 @@ export const it: Dict = {
     doneTrash: 'Sono nel cestino del telefono per 30 giorni; lo spazio si libera dopo, o quando lo svuoti.',
   },
   language: 'Lingua',
+  privacy: 'Privacy',
 };
