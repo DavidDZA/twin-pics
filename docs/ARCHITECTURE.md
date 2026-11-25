@@ -202,7 +202,7 @@ Kotlin à ajouter). Mise en route et premier essai : [ANDROID.md](ANDROID.md).
 - **Barres d'Android** (plein écran obligatoire depuis Android 15) : marges posées par Capacitor (`SystemBars`, la page
   n'a pas `viewport-fit=cover`). Fond de la fenêtre clair ou sombre comme la page.
 - **Pas de sauvegarde chez Google** (`allowBackup=false`) : la base contient des miniatures.
-- Version de `package.json` (0.12.0 → code 1200). Icône : `npm run icon:android`. Règles de confidentialité :
+- Version de `package.json` (0.12.1 → code 1201). Icône : `npm run icon:android`. Règles de confidentialité :
   `public/confidentialite.html` (6 langues).
 - **Photo illisible à la lecture** (disparue entre la liste et l'analyse, sur toutes les plateformes) : comptée illisible,
   l'analyse continue, rien n'est retenu en base (`error: 'read'`). Avant, toute l'analyse échouait.
@@ -511,6 +511,8 @@ durées par `Intl` (`bytes`, `duration`).
 
 ## 6. Tests
 
+- **Lire le code de retour, pas la fin de l'affichage** : `npm run e2e | grep … && git push` pousse même si des tests
+  échouent (le `grep` masque l'échec). C'est arrivé le 25/11/2026 (0.12.0 publiée avec 12 tests du site en échec).
 - `npx tsc -b`, `npm test`, `npm run build`, `npm run e2e`, `npm run e2e:pc` avant chaque push ; le déploiement et la
   construction de l'exe relancent `npm test`. Après `npm run dist`, `npm run e2e:exe` passe les tests sur l'exe.
 - **Vitest** : empreintes sur des images générées par sharp (`tests/images.ts` : même calcul que le worker, sous

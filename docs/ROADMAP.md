@@ -61,14 +61,17 @@
 > (24/11) **Version 0.11** : date lue dans le **nom du fichier** quand la photo n'a pas de date EXIF (ARCHITECTURE § 3).
 >
 > (25/11) **Version 0.12, première appli Android** (ARCHITECTURE § 2.3), feu vert de l'utilisateur : galerie, dossiers à cocher,
-> corbeille du téléphone, bouton Retour, paysage ; essayée sur un téléphone simulé à chaque push. 0.12.1 : pied de page du site, qui débordait au téléphone.
+> corbeille du téléphone, bouton Retour, paysage ; essayée sur un téléphone simulé à chaque push. **0.12.1** : pied de page du site, qui débordait au
+> téléphone (la 0.12.0, poussée trop vite, avait ce défaut : ARCHITECTURE § 6).
 >
-> **Reprendre ici** :
+> **Reprendre ici** (projet en pause depuis le 25/11/2026, à la demande de l'utilisateur ; rien en cours : la 0.12.1 est
+> publiée, `main` est vert, exe dans `release/`, pas d'autre branche) :
 >
-> 0. **Android, par l'utilisateur** : secrets de signature, appli dans la Play Console, test interne, premier essai et mesures
->    ([ANDROID.md](ANDROID.md)). Ensuite, selon les mesures : § 5, point 3.
+> 0. **Android, par l'utilisateur** : secrets de signature, appli dans la Play Console, test interne, premier essai et mesures.
+>    Pas à pas et état : [ANDROID.md](ANDROID.md). **Jamais essayée sur un vrai téléphone.** Ensuite, selon les mesures : § 5,
+>    point 3.
 >
-> 1. **Par l'utilisateur** : un vrai ménage de ses photos avec la 0.11 (seule l'utilisation montrera les manques). À
+> 1. **Par l'utilisateur** : un vrai ménage de ses photos sur PC avec la 0.12.1 (seule l'utilisation montrera les manques). À
 >    regarder : le clic de plus (« Analyser »), l'ordre des dossiers (poignée ⠿), l'avertissement pour une sauvegarde, les
 >    groupes mis de côté tout seuls, les rafales, les dates lues dans les noms.
 > 2. **Proposé** (pas encore décidé) : **annonce des nouvelles versions** et **astuces de première visite**
