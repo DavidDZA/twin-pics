@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DICTS, LANGS, bytes, deviceLang, duration } from '../src/i18n';
+import { readFileSync } from 'node:fs';
 import { REMOVE_DIR_PREFIX, isSkippedDir } from '../src/lib/filetypes';
 
 type Tree = { [k: string]: unknown };
@@ -55,6 +56,13 @@ describe('traduction', () => {
   it.each(LANGS)('%s : le dossier « À supprimer » n’est jamais analysé', (lang) => {
     expect(DICTS[lang].remove.folderName.startsWith(REMOVE_DIR_PREFIX)).toBe(true);
     expect(isSkippedDir(DICTS[lang].remove.folderName)).toBe(true);
+  });
+
+  it('règles de confidentialité : une partie par langue, les mêmes points', () => {
+    const html = readFileSync('public/confidentialite.html', 'utf8');
+    const points = (lang: string) => (html.match(new RegExp(`<section id="${lang}"[\\s\\S]*?</section>`))?.[0].match(/<li>/g) ?? []).length;
+    expect(points('fr')).toBeGreaterThan(3);
+    for (const lang of LANGS) expect(points(lang), lang).toBe(points('fr'));
   });
 
   it('langue de l’appareil, sinon l’anglais', () => {

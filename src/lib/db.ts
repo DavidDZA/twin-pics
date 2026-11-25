@@ -27,7 +27,7 @@ export interface PhotoRow {
   height?: number;
   time?: number;
   camera?: string;
-  /** La photo n'a pas pu être lue (« decode » : format non pris en charge par le navigateur). */
+  /** La photo n'a pas pu être lue : « decode », format non pris en charge ; « read », disparue (jamais en base). */
   error?: string;
   emb?: Float32Array;
   /** Modèle qui a calculé `emb` (`EMBED_ID`). */

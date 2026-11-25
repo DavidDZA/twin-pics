@@ -580,6 +580,9 @@ sans elles (photos déjà vues complétées).
   `e2e/android.spec.ts` (l'interface avec une fausse galerie, `window.twinPicsAndroid`) ; `e2e-android/` : la **vraie appli
   sur un téléphone simulé** (Android 15, dans GitHub Actions) — autorisation, analyse, paysage, corbeille d'Android,
   annulation, bouton Retour, modèle des photos similaires. Le résultat et les erreurs sont en annotations du workflow.
+  Pièges : Playwright fait croire à la page qu'elle est toujours visible (l'arrière-plan se vérifie par `dumpsys`) ; les
+  fenêtres d'Android se trouvent par `uiautomator` ; « … ne répond pas » est normal sur ce téléphone très chargé.
+  `i18n.test.ts` : les règles de confidentialité ont les mêmes points dans les 6 langues.
 
 ## 7. Conventions
 

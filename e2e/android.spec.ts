@@ -69,6 +69,7 @@ test('première ouverture : autorisation, refus, photos choisies', async ({ page
   // Rien de l'appli PC ni du site.
   await expect(page.getByRole('button', { name: 'Choisir un dossier de photos' })).toHaveCount(0);
   await expect(page.getByText('Télécharger l’appli PC')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Confidentialité' })).toHaveAttribute('href', /confidentialite\.html$/);
   // Recherches longues : décochées au départ sur un téléphone.
   await expect(page.getByRole('checkbox', { name: /photos similaires/ })).not.toBeChecked();
   await expect(page.getByRole('checkbox', { name: /documents, tickets et mèmes/ })).not.toBeChecked();

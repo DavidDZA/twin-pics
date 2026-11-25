@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main, android]
-    paths: ['android/**', 'src/**', 'e2e-android/**', 'package.json', 'package-lock.json', 'capacitor.config.json', 'playwright.android.config.ts', '.github/workflows/android.yml']
+    paths: ['android/**', 'src/**', 'public/**', 'index.html', 'e2e-android/**', 'package.json', 'package-lock.json', 'capacitor.config.json', 'playwright.android.config.ts', '.github/workflows/android.yml']
 
 permissions:
   contents: read

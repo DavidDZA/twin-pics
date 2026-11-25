@@ -57,6 +57,9 @@ const screenshot = (name: string) => {
 /** Images de la galerie d'Android (hors corbeille). */
 const galleryCount = () => (shell('content query --uri content://media/external/images/media --projection _id').match(/^Row:/gm) ?? []).length;
 
+/** L'appli est-elle au premier plan ? */
+const inFront = () => /ResumedActivity.*io\.github\.daviddza\.twinpics/.test(shell('dumpsys activity activities'));
+
 let device: AndroidDevice;
 
 /** Une attente sans limite de Playwright : limitée, et nommée si elle échoue. */
@@ -176,11 +179,13 @@ test('autorisation, analyse, corbeille du téléphone, bouton Retour, rotation',
   await expect(report).toContainText('2 photos remises à leur place.');
   expect(galleryCount()).toBe(total);
 
+  expect(inFront()).toBe(true);
   // Retour : résultats → départ → arrière-plan, sans perdre la page.
   shell('input keyevent KEYCODE_BACK');
   await expect(page.getByRole('button', { name: /^Analyser/ })).toBeVisible();
   shell('input keyevent KEYCODE_BACK');
-  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('hidden');
+  // Vu du côté d'Android : Playwright fait croire à la page qu'elle est toujours visible.
+  await expect.poll(() => inFront(), { timeout: 15_000 }).toBe(false);
   expect(await page.getByRole('button', { name: /^Analyser/ }).count()).toBe(1);
 
   // Pour information : la carte graphique dans la WebView de cet appareil.
@@ -201,5 +206,11 @@ test('modèle des photos similaires dans la WebView', async () => {
   await expect(page.getByTestId('analyzed')).toBeVisible({ timeout: 200_000 });
   await expect(page.getByText(/Photos similaires calculées par/)).toBeVisible();
   console.log(`::notice title=Modèle::${await page.locator('.scan-info').innerText()}`);
-  await expect(page.getByText('rafale-1.jpg').first()).toBeVisible();
+  // La rafale d'essai ressemble à environ 87 % : ressemblance minimale abaissée, comme dans les tests du site.
+  await page.getByText('Réglages de la détection').click();
+  await page.locator('.slider', { hasText: 'ressemblance minimale' }).locator('input').fill('80');
+  await page.getByRole('tab', { name: /Similaires/ }).click();
+  const group = page.getByTestId('group').first();
+  await expect(group.locator('li.best .name')).toHaveText('rafale-1.jpg');
+  await expect(group.getByText(/ressemble à \d+ %/)).toBeVisible();
 });
